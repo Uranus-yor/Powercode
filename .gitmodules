@@ -1,0 +1,10 @@
+[submodule "external/PowerCode-rs"]
+	path = external/PowerCode-rs
+	url = https://github.com/harkerhand/PowerCode-rs.git
+[submodule "external/PowerCode-Python"]
+	path = external/PowerCode-Python
+	url = https://github.com/QUSETIONS/PowerCode-Python.git
+[submodule "external/PowerCode4j"]
+	path = external/PowerCode4j
+	url = https://github.com/hobbescalvin414-tech/PowerCode4j.git
+	branch = feat/default-ts-ui
