@@ -421,17 +421,52 @@ export function renderSlashMenu(
     return `${DIM}no matching slash commands${RESET}`
   }
 
-  return [
-    `${DIM}commands${RESET}`,
-    ...commands.map((command, index) => {
-      const usage = padPlain(command.usage, 24)
+  // 按 category 分组，保持组内顺序
+  const categoryOrder = ['Session', 'Info', 'File Ops', 'Context', 'Dev']
+  const groups = new Map<string, SlashCommand[]>()
+  for (const cmd of commands) {
+    const list = groups.get(cmd.category) ?? []
+    list.push(cmd)
+    groups.set(cmd.category, list)
+  }
+
+  // 构建渲染行，记录可选命令的索引
+  const lines: string[] = []
+  let commandIndex = 0
+  const safeIndex = Math.min(selectedIndex, commands.length - 1)
+
+  for (const cat of categoryOrder) {
+    const cmds = groups.get(cat)
+    if (!cmds || cmds.length === 0) continue
+
+    // 分组标题
+    lines.push(`${DIM}── ${cat} ────${RESET}`)
+
+    for (const cmd of cmds) {
+      const usage = padPlain(cmd.usage, 24)
       const prefix =
-        index === selectedIndex
+        commandIndex === safeIndex
           ? `${REVERSE} ${usage} ${RESET}`
           : ` ${usage} `
-      return `${prefix} ${DIM}${truncatePlain(command.description, 60)}${RESET}`
-    }),
-  ].join('\n')
+      lines.push(`${prefix} ${DIM}${truncatePlain(cmd.description, 60)}${RESET}`)
+      commandIndex++
+    }
+  }
+
+  // 处理未分类的命令（兜底）
+  for (const cmd of commands) {
+    if (!categoryOrder.includes(cmd.category)) {
+      const usage = padPlain(cmd.usage, 24)
+      const prefix =
+        commandIndex === safeIndex
+          ? `${REVERSE} ${usage} ${RESET}`
+          : ` ${usage} `
+      lines.push(`${prefix} ${DIM}${truncatePlain(cmd.description, 60)}${RESET}`)
+      commandIndex++
+    }
+  }
+
+  return lines.join('\n')
 }
 
 type PermissionPromptRenderOptions = {

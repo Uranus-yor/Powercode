@@ -15,6 +15,7 @@ export type SlashCommand = {
   name: string
   usage: string
   description: string
+  category: string
 }
 
 /**
@@ -23,140 +24,172 @@ export type SlashCommand = {
  */
 
 export const SLASH_COMMANDS: SlashCommand[] = [
+  // ── Session ──
   {
-    name: '/help',
-    usage: '/help',
-    description: 'Show available slash commands.',
-  },
-  {
-    name: '/tools',
-    usage: '/tools',
-    description: 'List tools available to the coding agent and tool shortcuts.',
-  },
-  {
-    name: '/status',
-    usage: '/status',
-    description: 'Show current model and config source.',
-  },
-  {
-    name: '/model',
-    usage: '/model',
-    description: 'Show the current model.',
-  },
-  {
-    name: '/model',
-    usage: '/model <model-name>',
-    description: 'Persist a model override into ~/.powercode/settings.json.',
-  },
-  {
-    name: '/config-paths',
-    usage: '/config-paths',
-    description: 'Show PowerCode and Claude fallback settings paths.',
-  },
-  {
-    name: '/skills',
-    usage: '/skills',
-    description: 'List discovered SKILL.md workflows.',
-  },
-  {
-    name: '/mcp',
-    usage: '/mcp',
-    description: 'Show configured MCP servers and connection state.',
+    name: '/new',
+    usage: '/new',
+    description: 'Clear saved session and start fresh.',
+    category: 'Session',
   },
   {
     name: '/resume',
     usage: '/resume',
     description: 'Resume a saved session (interactive picker, or /resume <id>).',
+    category: 'Session',
   },
   {
     name: '/rename',
     usage: '/rename <name>',
     description: 'Rename the current session.',
-  },
-  {
-    name: '/new',
-    usage: '/new',
-    description: 'Clear saved session and start fresh.',
+    category: 'Session',
   },
   {
     name: '/fork',
     usage: '/fork',
     description: 'Fork current session into a new independent session.',
-  },
-  {
-    name: '/permissions',
-    usage: '/permissions',
-    description: 'Show PowerCode permission storage path.',
+    category: 'Session',
   },
   {
     name: '/exit',
     usage: '/exit',
     description: 'Exit PowerCode.',
+    category: 'Session',
+  },
+  // ── Info ──
+  {
+    name: '/help',
+    usage: '/help',
+    description: 'Show available slash commands.',
+    category: 'Info',
   },
   {
-    name: '/ls',
-    usage: '/ls [path]',
-    description: 'List files in a directory.',
+    name: '/status',
+    usage: '/status',
+    description: 'Show current model and config source.',
+    category: 'Info',
   },
   {
-    name: '/grep',
-    usage: '/grep <pattern>::[path]',
-    description: 'Search text in files.',
+    name: '/model',
+    usage: '/model',
+    description: 'Show the current model.',
+    category: 'Info',
   },
   {
-    name: '/read',
-    usage: '/read <path>',
-    description: 'Read a file directly.',
+    name: '/model',
+    usage: '/model <model-name>',
+    description: 'Persist a model override into ~/.powercode/settings.json.',
+    category: 'Info',
   },
   {
-    name: '/write',
-    usage: '/write <path>::<content>',
-    description: 'Write a file directly.',
+    name: '/tools',
+    usage: '/tools',
+    description: 'List tools available to the coding agent and tool shortcuts.',
+    category: 'Info',
   },
   {
-    name: '/modify',
-    usage: '/modify <path>::<content>',
-    description: 'Replace a file, showing a reviewable diff before applying it.',
+    name: '/skills',
+    usage: '/skills',
+    description: 'List discovered SKILL.md workflows.',
+    category: 'Info',
   },
   {
-    name: '/edit',
-    usage: '/edit <path>::<search>::<replace>',
-    description: 'Edit a file by exact replacement.',
-  },
-  {
-    name: '/patch',
-    usage: '/patch <path>::<search1>::<replace1>::<search2>::<replace2>...',
-    description: 'Apply multiple replacements to one file in one command.',
-  },
-  {
-    name: '/cmd',
-    usage: '/cmd [cwd::]<command> [args...]',
-    description: 'Run an allowed development command directly, optionally in another directory.',
-  },
-  {
-    name: '/compact',
-    usage: '/compact',
-    description: 'Compress conversation context to free up context window space.',
-  },
-  {
-    name: '/collapse',
-    usage: '/collapse',
-    description: 'Project old safe context spans into summaries without deleting the transcript.',
-  },
-  {
-    name: '/snip',
-    usage: '/snip',
-    description: 'Remove a safe middle segment of conversation context without calling the model.',
-  },
-  {
-    name: '/init',
-    usage: '/init',
-    description: 'Create .powercode/, .gitignore entries, and MINI.md in the current project (idempotent).',
+    name: '/mcp',
+    usage: '/mcp',
+    description: 'Show configured MCP servers and connection state.',
+    category: 'Info',
   },
   {
     name: '/memory',
     usage: '/memory',
     description: 'Show instruction files loaded into the system prompt.',
+    category: 'Info',
+  },
+  {
+    name: '/config-paths',
+    usage: '/config-paths',
+    description: 'Show PowerCode and Claude fallback settings paths.',
+    category: 'Info',
+  },
+  {
+    name: '/permissions',
+    usage: '/permissions',
+    description: 'Show PowerCode permission storage path.',
+    category: 'Info',
+  },
+  // ── File Ops ──
+  {
+    name: '/ls',
+    usage: '/ls [path]',
+    description: 'List files in a directory.',
+    category: 'File Ops',
+  },
+  {
+    name: '/grep',
+    usage: '/grep <pattern>::[path]',
+    description: 'Search text in files.',
+    category: 'File Ops',
+  },
+  {
+    name: '/read',
+    usage: '/read <path>',
+    description: 'Read a file directly.',
+    category: 'File Ops',
+  },
+  {
+    name: '/write',
+    usage: '/write <path>::<content>',
+    description: 'Write a file directly.',
+    category: 'File Ops',
+  },
+  {
+    name: '/modify',
+    usage: '/modify <path>::<content>',
+    description: 'Replace a file, showing a reviewable diff before applying it.',
+    category: 'File Ops',
+  },
+  {
+    name: '/edit',
+    usage: '/edit <path>::<search>::<replace>',
+    description: 'Edit a file by exact replacement.',
+    category: 'File Ops',
+  },
+  {
+    name: '/patch',
+    usage: '/patch <path>::<search1>::<replace1>::<search2>::<replace2>...',
+    description: 'Apply multiple replacements to one file in one command.',
+    category: 'File Ops',
+  },
+  // ── Context ──
+  {
+    name: '/compact',
+    usage: '/compact',
+    description: 'Compress conversation context to free up context window space.',
+    category: 'Context',
+  },
+  {
+    name: '/collapse',
+    usage: '/collapse',
+    description: 'Project old safe context spans into summaries without deleting the transcript.',
+    category: 'Context',
+  },
+  {
+    name: '/snip',
+    usage: '/snip',
+    description: 'Remove a safe middle segment of conversation context without calling the model.',
+    category: 'Context',
+  },
+  // ── Dev ──
+  {
+    name: '/cmd',
+    usage: '/cmd [cwd::]<command> [args...]',
+    description: 'Run an allowed development command directly, optionally in another directory.',
+    category: 'Dev',
+  },
+  {
+    name: '/init',
+    usage: '/init',
+    description: 'Create .powercode/, .gitignore entries, and MINI.md in the current project (idempotent).',
+    category: 'Dev',
   },
 ]
 
@@ -168,6 +201,49 @@ export function findMatchingSlashCommands(input: string): string[] {
   return SLASH_COMMANDS
     .map(command => command.usage)
     .filter(command => command.startsWith(input))
+}
+
+/** 中文别名映射表 */
+export const COMMAND_ALIASES: Record<string, string> = {
+  '/搜索': '/grep',
+  '/读取': '/read',
+  '/写入': '/write',
+  '/技能': '/skills',
+  '/工具': '/tools',
+  '/帮助': '/help',
+  '/状态': '/status',
+  '/模型': '/model',
+  '/压缩': '/compact',
+  '/退出': '/exit',
+}
+
+/**
+ * 解析中文别名，返回对应的英文命令
+ * 如果不是别名，原样返回
+ */
+export function resolveAlias(input: string): string {
+  const trimmed = input.trim()
+  // 精确匹配：/帮助 → /help
+  if (COMMAND_ALIASES[trimmed]) {
+    return COMMAND_ALIASES[trimmed]
+  }
+  // 带参数匹配：/搜索 test → /grep test
+  const spaceIndex = trimmed.indexOf(' ')
+  if (spaceIndex !== -1) {
+    const prefix = trimmed.slice(0, spaceIndex)
+    const rest = trimmed.slice(spaceIndex)
+    if (COMMAND_ALIASES[prefix]) {
+      return COMMAND_ALIASES[prefix] + rest
+    }
+  }
+  return input
+}
+
+/**
+ * 查找匹配别名前缀的命令（用于 Tab 补全）
+ */
+export function findMatchingAliases(input: string): string[] {
+  return Object.keys(COMMAND_ALIASES).filter(alias => alias.startsWith(input))
 }
 
 export async function tryHandleLocalCommand(

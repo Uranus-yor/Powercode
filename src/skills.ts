@@ -29,7 +29,14 @@ type SkillSourceRoot = {
 type SkillScope = 'user' | 'project'
 
 function extractDescription(markdown: string): string {
-  const normalized = markdown.replace(/\r\n/g, '\n')
+  // 优先使用 frontmatter 中的 description
+  const fm = parseFrontmatter(markdown)
+  if (fm.description) {
+    return fm.description
+  }
+
+  // 降级：从正文第一段提取
+  const normalized = fm.body.replace(/\r\n/g, '\n')
   const paragraphs = normalized
     .split('\n\n')
     .map(block => block.trim())
@@ -51,6 +58,92 @@ function extractDescription(markdown: string): string {
   }
 
   return 'No description provided.'
+}
+
+/** frontmatter 解析结果 */
+type FrontmatterResult = {
+  name?: string
+  description?: string
+  body: string
+}
+
+/**
+ * 解析 SKILL.md 的 YAML frontmatter
+ * 只处理简单的 key: value 格式，格式错误时不抛异常
+ */
+export function parseFrontmatter(content: string): FrontmatterResult {
+  const normalized = content.replace(/\r\n/g, '\n')
+
+  // 检测 --- 开头
+  if (!normalized.startsWith('---\n')) {
+    return { body: content }
+  }
+
+  // 查找结束 ---
+  const endIndex = normalized.indexOf('\n---\n', 4)
+  if (endIndex === -1) {
+    // 没有结束分隔符，视为格式错误
+    return { body: content }
+  }
+
+  const frontmatterBlock = normalized.slice(4, endIndex)
+  const body = normalized.slice(endIndex + 5) // 跳过 \n---\n
+
+  let name: string | undefined
+  let description: string | undefined
+
+  for (const line of frontmatterBlock.split('\n')) {
+    const colonIndex = line.indexOf(':')
+    if (colonIndex === -1) continue
+
+    const key = line.slice(0, colonIndex).trim()
+    let value = line.slice(colonIndex + 1).trim()
+
+    // 去除引号
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1)
+    }
+
+    if (key === 'name' && value) {
+      name = value
+    } else if (key === 'description' && value) {
+      description = value
+    }
+  }
+
+  return { name, description, body }
+}
+
+/**
+ * 从 SKILL.md 正文中自动提取触发条件
+ * 匹配包含「当用户」「如果用户」「当...时」「when the user」「if the user」的句子
+ */
+export function extractTriggers(content: string): string[] {
+  const patterns = [
+    /当用户[^，。！？\n]+[，。！？]/g,
+    /如果用户[^，。！？\n]+[，。！？]/g,
+    /当[^，。！？\n]{2,}时[，。！？]/g,
+    /[Ww]hen the user[^.!?]+[.!?]/g,
+    /[Ii]f the user[^.!?]+[.!?]/g,
+  ]
+
+  const triggers: string[] = []
+  const seen = new Set<string>()
+
+  for (const pattern of patterns) {
+    const matches = content.match(pattern)
+    if (!matches) continue
+    for (const match of matches) {
+      const trimmed = match.trim()
+      if (!seen.has(trimmed)) {
+        seen.add(trimmed)
+        triggers.push(trimmed)
+      }
+    }
+  }
+
+  return triggers
 }
 
 function getSkillRoots(cwd: string): SkillSourceRoot[] {
@@ -94,8 +187,9 @@ async function listSkillDirs(root: SkillSourceRoot): Promise<LoadedSkill[]> {
 
       try {
         const content = await readFile(skillPath, 'utf8')
+        const fm = parseFrontmatter(content)
         results.push({
-          name: entry.name,
+          name: fm.name ?? entry.name,
           description: extractDescription(content),
           path: skillPath,
           source: root.source,
@@ -153,8 +247,9 @@ export async function loadSkill(
     const skillPath = path.join(root.root, normalizedName, 'SKILL.md')
     try {
       const content = await readFile(skillPath, 'utf8')
+      const fm = parseFrontmatter(content)
       return {
-        name: normalizedName,
+        name: fm.name ?? normalizedName,
         description: extractDescription(content),
         path: skillPath,
         source: root.source,

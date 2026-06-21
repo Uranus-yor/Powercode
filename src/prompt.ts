@@ -1,5 +1,6 @@
 import type { McpServerSummary } from './mcp.js'
 import type { SkillSummary } from './skills.js'
+import { loadSkill, extractTriggers } from './skills.js'
 import { loadMemory } from './memory.js'
 
 export async function buildSystemPrompt(
@@ -23,7 +24,11 @@ export async function buildSystemPrompt(
     'If you need user clarification, call the ask_user tool with one concise question and wait for the user reply. Do not ask clarifying questions as plain assistant text.',
     'Do not choose subjective preferences such as colors, visual style, copy tone, or naming unless the user explicitly told you to decide yourself.',
     'When using read_file, pay attention to the header fields. If it says TRUNCATED: yes, continue reading with a larger offset before concluding that the file itself is cut off.',
-    'If the user names a skill or clearly asks for a workflow that matches a listed skill, call load_skill before following it.',
+    'Skill 使用规则：',
+    '- 仔细阅读每个 skill 的描述和触发条件',
+    '- 当用户输入匹配某个 skill 的触发条件时，必须先调用 load_skill 加载该 skill',
+    '- 如果不确定是否匹配，优先加载最相关的 skill，而不是跳过',
+    '- 加载 skill 后，严格按照 skill 中的工作流执行',
     'Structured response protocol:',
     '- When you are still working and will continue with more tool calls, start your text with <progress>.',
     '- Only when the task is actually complete and you are ready to hand control back, start your text with <final>.',
@@ -38,11 +43,23 @@ export async function buildSystemPrompt(
 
   const skills = extras?.skills ?? []
   if (skills.length > 0) {
-    parts.push(
-      `Available skills:\n${skills
-        .map(skill => `- ${skill.name}: ${skill.description}`)
-        .join('\n')}`,
-    )
+    const skillLines: string[] = []
+    for (const skill of skills) {
+      let line = `- ${skill.name}: ${skill.description}`
+      try {
+        const loaded = await loadSkill(cwd, skill.name)
+        if (loaded) {
+          const triggers = extractTriggers(loaded.content)
+          if (triggers.length > 0) {
+            line += `\n  触发: ${triggers.join(' ')}`
+          }
+        }
+      } catch {
+        // 忽略加载失败，只显示描述
+      }
+      skillLines.push(line)
+    }
+    parts.push(`Available skills:\n${skillLines.join('\n')}`)
   } else {
     parts.push('Available skills:\n- none discovered')
   }

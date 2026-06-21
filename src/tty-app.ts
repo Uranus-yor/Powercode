@@ -5,6 +5,9 @@ import { runAgentTurn } from './agent-loop.js'
 import {
   SLASH_COMMANDS,
   findMatchingSlashCommands,
+  findMatchingAliases,
+  resolveAlias,
+  COMMAND_ALIASES,
   tryHandleLocalCommand,
 } from './cli-commands.js'
 import { loadHistoryEntries, saveHistoryEntries } from './history.js'
@@ -41,7 +44,6 @@ import {
   getPermissionPromptMaxScrollOffset,
   renderBanner,
   renderFooterBar,
-  renderInputPrompt,
   renderPanel,
   renderPermissionPrompt,
   renderSlashMenu,
@@ -182,20 +184,6 @@ function renderHeaderPanel(args: TtyAppArgs, state: ScreenState): string {
     args.permissions.getSummary(),
     getSessionStats(args, state),
   )
-}
-
-function renderPromptPanel(state: ScreenState): string {
-  const commands = getVisibleCommands(state.input)
-  const promptBody = [
-    renderInputPrompt(state.input, state.cursorOffset),
-    commands.length > 0
-      ? `\n${renderSlashMenu(
-          commands,
-          Math.min(state.selectedSlashIndex, commands.length - 1),
-        )}`
-      : '',
-  ].join('')
-  return renderPanel('prompt', promptBody)
 }
 
 function getTranscriptBodyLines(_args: TtyAppArgs, state: ScreenState): number {
@@ -387,7 +375,20 @@ function getVisibleCommands(input: string) {
   if (!input.startsWith('/')) return []
   if (input === '/') return SLASH_COMMANDS
   const matches = findMatchingSlashCommands(input)
-  return SLASH_COMMANDS.filter(command => matches.includes(command.usage))
+  if (matches.length > 0) {
+    return SLASH_COMMANDS.filter(command => matches.includes(command.usage))
+  }
+  // 英文无匹配时，检查是否匹配中文别名前缀
+  const aliasMatches = findMatchingAliases(input)
+  if (aliasMatches.length > 0) {
+    return aliasMatches.map(alias => ({
+      name: alias,
+      usage: alias,
+      description: `→ ${COMMAND_ALIASES[alias]}`,
+      category: 'Alias',
+    }))
+  }
+  return []
 }
 
 function pushTranscriptEntry(
@@ -553,21 +554,6 @@ function extractPathFromToolInput(input: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value : null
 }
 
-function getCursorPos(
-  parts: string[],
-  state: ScreenState,
-  leftPad: number,
-): { row: number; col: number } {
-  const totalLines = parts.reduce((sum, p) => sum + p.split('\n').length, 0)
-  const inputRow = totalLines - 3
-
-  const inputText = state.input ?? ''
-  const beforeCursor = inputText.slice(0, Math.min(state.cursorOffset, inputText.length))
-  const cursorCol = leftPad + 5 + stringDisplayWidth(beforeCursor)
-
-  return { row: inputRow, col: cursorCol }
-}
-
 function renderScreen(args: TtyAppArgs, state: ScreenState): void {
   const backgroundTasks = listBackgroundTasks()
   const parts: string[] = []
@@ -660,7 +646,29 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
         state.cursorOffset,
       ),
     )
-    flushFrame(parts, getCursorPos(parts, state, centeredLeftPad))
+
+    // 斜杠菜单
+    const startupCommands = getVisibleCommands(state.input)
+    let startupMenuLineCount = 0
+    if (startupCommands.length > 0) {
+      const menuStr = renderSlashMenu(
+        startupCommands,
+        Math.min(state.selectedSlashIndex, startupCommands.length - 1),
+      )
+      const menuPad = ' '.repeat(centeredLeftPad)
+      const menuLines = menuStr.split('\n')
+      startupMenuLineCount = menuLines.length
+      for (const line of menuLines) {
+        parts.push(menuPad + line)
+      }
+    }
+
+    const totalLines = parts.reduce((sum, p) => sum + p.split('\n').length, 0)
+    const inputRow = totalLines - 4 - startupMenuLineCount
+    const inputText = state.input ?? ''
+    const beforeCursor = inputText.slice(0, Math.min(state.cursorOffset, inputText.length))
+    const cursorCol = centeredLeftPad + 5 + stringDisplayWidth(beforeCursor)
+    flushFrame(parts, { row: inputRow, col: cursorCol })
     return
   }
 
@@ -692,7 +700,25 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
       state.cursorOffset,
     ),
   )
-  flushFrame(parts, getCursorPos(parts, state, leftPad))
+
+  // 斜杠菜单（在 flushFrame 之前，不加入 parts，单独计算行数）
+  const commands = getVisibleCommands(state.input)
+  let menuLineCount = 0
+  if (commands.length > 0) {
+    const menuStr = renderSlashMenu(
+      commands,
+      Math.min(state.selectedSlashIndex, commands.length - 1),
+    )
+    menuLineCount = menuStr.split('\n').length
+    parts.push(menuStr)
+  }
+
+  const totalLines = parts.reduce((sum, p) => sum + p.split('\n').length, 0)
+  const inputRow = totalLines - 4 - menuLineCount
+  const inputText = state.input ?? ''
+  const beforeCursor = inputText.slice(0, Math.min(state.cursorOffset, inputText.length))
+  const cursorCol = leftPad + 5 + stringDisplayWidth(beforeCursor)
+  flushFrame(parts, { row: inputRow, col: cursorCol })
 }
 
 function flushFrame(parts: string[], cursorPos?: { row: number; col: number }): void {
@@ -863,8 +889,9 @@ async function handleInput(
     return false
   }
 
-  const input = (submittedRawInput ?? state.input).trim()
-  if (!input) return false
+  const rawInput = (submittedRawInput ?? state.input).trim()
+  if (!rawInput) return false
+  const input = resolveAlias(rawInput)
   if (input === '/exit') return true
 
   // /collapse: persistent model-visible projection; original transcript remains intact
