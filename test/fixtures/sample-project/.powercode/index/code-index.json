@@ -1,0 +1,1309 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "createdAt": 1782036526808,
+    "updatedAt": 1782036526808,
+    "fileCount": 8,
+    "symbolCount": 43,
+    "projectRoot": "C:\\Users\\Uranus\\Desktop\\ai应用项目\\PowerCode\\test\\fixtures\\sample-project"
+  },
+  "symbols": {
+    "Order": [
+      {
+        "name": "Order",
+        "kind": "class",
+        "file": "src\\models\\order.ts",
+        "startLine": 3,
+        "endLine": 9,
+        "content": "class Order {\n  constructor(\n    public id: string,\n    public user: User,\n    public amount: number\n  ) {}\n}",
+        "exportKind": "none"
+      },
+      {
+        "name": "Order",
+        "kind": "class",
+        "file": "src\\models\\order.ts",
+        "startLine": 3,
+        "endLine": 9,
+        "content": "class Order {\n  constructor(\n    public id: string,\n    public user: User,\n    public amount: number\n  ) {}\n}",
+        "exportKind": "none"
+      }
+    ],
+    "constructor": [
+      {
+        "name": "constructor",
+        "kind": "method",
+        "file": "src\\models\\order.ts",
+        "startLine": 4,
+        "endLine": 8,
+        "content": "constructor(\n    public id: string,\n    public user: User,\n    public amount: number\n  ) {}",
+        "parentName": "Order",
+        "parameters": [
+          "id",
+          "user",
+          "amount"
+        ],
+        "exportKind": "named"
+      },
+      {
+        "name": "constructor",
+        "kind": "method",
+        "file": "src\\models\\order.ts",
+        "startLine": 4,
+        "endLine": 8,
+        "content": "constructor(\n    public id: string,\n    public user: User,\n    public amount: number\n  ) {}",
+        "parentName": "Order",
+        "parameters": [
+          "id",
+          "user",
+          "amount"
+        ]
+      },
+      {
+        "name": "constructor",
+        "kind": "method",
+        "file": "src\\models\\user.ts",
+        "startLine": 2,
+        "endLine": 6,
+        "content": "constructor(\n    public id: string,\n    public name: string,\n    public email: string\n  ) {}",
+        "parentName": "User",
+        "parameters": [
+          "id",
+          "name",
+          "email"
+        ],
+        "exportKind": "named"
+      },
+      {
+        "name": "constructor",
+        "kind": "method",
+        "file": "src\\models\\user.ts",
+        "startLine": 2,
+        "endLine": 6,
+        "content": "constructor(\n    public id: string,\n    public name: string,\n    public email: string\n  ) {}",
+        "parentName": "User",
+        "parameters": [
+          "id",
+          "name",
+          "email"
+        ]
+      },
+      {
+        "name": "constructor",
+        "kind": "method",
+        "file": "src\\services\\order-service.ts",
+        "startLine": 6,
+        "endLine": 6,
+        "content": "constructor(private userService: UserService) {}",
+        "parentName": "OrderService",
+        "parameters": [
+          "userService"
+        ]
+      },
+      {
+        "name": "constructor",
+        "kind": "method",
+        "file": "src\\services\\order-service.ts",
+        "startLine": 6,
+        "endLine": 6,
+        "content": "constructor(private userService: UserService) {}",
+        "parentName": "OrderService",
+        "parameters": [
+          "userService"
+        ]
+      }
+    ],
+    "User": [
+      {
+        "name": "User",
+        "kind": "class",
+        "file": "src\\models\\user.ts",
+        "startLine": 1,
+        "endLine": 7,
+        "content": "class User {\n  constructor(\n    public id: string,\n    public name: string,\n    public email: string\n  ) {}\n}",
+        "exportKind": "none"
+      },
+      {
+        "name": "User",
+        "kind": "class",
+        "file": "src\\models\\user.ts",
+        "startLine": 1,
+        "endLine": 7,
+        "content": "class User {\n  constructor(\n    public id: string,\n    public name: string,\n    public email: string\n  ) {}\n}",
+        "exportKind": "none"
+      }
+    ],
+    "userService": [
+      {
+        "name": "userService",
+        "kind": "variable",
+        "file": "src\\routes\\order-routes.ts",
+        "startLine": 4,
+        "endLine": 4,
+        "content": "const userService = new UserService()"
+      },
+      {
+        "name": "userService",
+        "kind": "variable",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 3,
+        "endLine": 3,
+        "content": "const userService = new UserService()"
+      }
+    ],
+    "orderService": [
+      {
+        "name": "orderService",
+        "kind": "variable",
+        "file": "src\\routes\\order-routes.ts",
+        "startLine": 5,
+        "endLine": 5,
+        "content": "const orderService = new OrderService(userService)"
+      }
+    ],
+    "handleCreateOrder": [
+      {
+        "name": "handleCreateOrder",
+        "kind": "function",
+        "file": "src\\routes\\order-routes.ts",
+        "startLine": 7,
+        "endLine": 11,
+        "content": "async function handleCreateOrder(req: Request) {\n  const { userId, amount } = await req.json()\n  const order = await orderService.createOrder(userId, amount)\n  return new Response(JSON.stringify(order))\n}",
+        "parameters": [
+          "req"
+        ],
+        "exportKind": "none"
+      },
+      {
+        "name": "handleCreateOrder",
+        "kind": "function",
+        "file": "src\\routes\\order-routes.ts",
+        "startLine": 7,
+        "endLine": 11,
+        "content": "async function handleCreateOrder(req: Request) {\n  const { userId, amount } = await req.json()\n  const order = await orderService.createOrder(userId, amount)\n  return new Response(JSON.stringify(order))\n}",
+        "parameters": [
+          "req"
+        ],
+        "exportKind": "none"
+      }
+    ],
+    "order": [
+      {
+        "name": "order",
+        "kind": "variable",
+        "file": "src\\routes\\order-routes.ts",
+        "startLine": 9,
+        "endLine": 9,
+        "content": "const order = await orderService.createOrder(userId, amount)",
+        "exportKind": "named"
+      },
+      {
+        "name": "order",
+        "kind": "variable",
+        "file": "src\\routes\\order-routes.ts",
+        "startLine": 9,
+        "endLine": 9,
+        "content": "const order = await orderService.createOrder(userId, amount)"
+      }
+    ],
+    "handleCreateUser": [
+      {
+        "name": "handleCreateUser",
+        "kind": "function",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 5,
+        "endLine": 9,
+        "content": "async function handleCreateUser(req: Request) {\n  const { name, email } = await req.json()\n  const user = await userService.createUser(name, email)\n  return new Response(JSON.stringify(user))\n}",
+        "parameters": [
+          "req"
+        ],
+        "exportKind": "none"
+      },
+      {
+        "name": "handleCreateUser",
+        "kind": "function",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 5,
+        "endLine": 9,
+        "content": "async function handleCreateUser(req: Request) {\n  const { name, email } = await req.json()\n  const user = await userService.createUser(name, email)\n  return new Response(JSON.stringify(user))\n}",
+        "parameters": [
+          "req"
+        ],
+        "exportKind": "none"
+      }
+    ],
+    "user": [
+      {
+        "name": "user",
+        "kind": "variable",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 7,
+        "endLine": 7,
+        "content": "const user = await userService.createUser(name, email)",
+        "exportKind": "named"
+      },
+      {
+        "name": "user",
+        "kind": "variable",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 7,
+        "endLine": 7,
+        "content": "const user = await userService.createUser(name, email)"
+      },
+      {
+        "name": "user",
+        "kind": "variable",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 15,
+        "endLine": 15,
+        "content": "const user = await userService.getUser(id)",
+        "exportKind": "named"
+      },
+      {
+        "name": "user",
+        "kind": "variable",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 15,
+        "endLine": 15,
+        "content": "const user = await userService.getUser(id)"
+      },
+      {
+        "name": "user",
+        "kind": "variable",
+        "file": "test\\user-service.test.ts",
+        "startLine": 8,
+        "endLine": 8,
+        "content": "const user = await service.createUser(\"test\", \"test@example.com\")"
+      }
+    ],
+    "handleGetUser": [
+      {
+        "name": "handleGetUser",
+        "kind": "function",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 11,
+        "endLine": 18,
+        "content": "async function handleGetUser(req: Request) {\n  const url = new URL(req.url)\n  const id = url.pathname.split(\"/\").pop()\n  if (!id) return new Response(\"Missing id\", { status: 400 })\n  const user = await userService.getUser(id)\n  if (!user) return new Response(\"Not found\", { status: 404 })\n  return new Response(JSON.stringify(user))\n}",
+        "parameters": [
+          "req"
+        ],
+        "exportKind": "none"
+      },
+      {
+        "name": "handleGetUser",
+        "kind": "function",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 11,
+        "endLine": 18,
+        "content": "async function handleGetUser(req: Request) {\n  const url = new URL(req.url)\n  const id = url.pathname.split(\"/\").pop()\n  if (!id) return new Response(\"Missing id\", { status: 400 })\n  const user = await userService.getUser(id)\n  if (!user) return new Response(\"Not found\", { status: 404 })\n  return new Response(JSON.stringify(user))\n}",
+        "parameters": [
+          "req"
+        ],
+        "exportKind": "none"
+      }
+    ],
+    "url": [
+      {
+        "name": "url",
+        "kind": "variable",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 12,
+        "endLine": 12,
+        "content": "const url = new URL(req.url)"
+      },
+      {
+        "name": "url",
+        "kind": "variable",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 12,
+        "endLine": 12,
+        "content": "const url = new URL(req.url)"
+      }
+    ],
+    "id": [
+      {
+        "name": "id",
+        "kind": "variable",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 13,
+        "endLine": 13,
+        "content": "const id = url.pathname.split(\"/\").pop()"
+      },
+      {
+        "name": "id",
+        "kind": "variable",
+        "file": "src\\routes\\user-routes.ts",
+        "startLine": 13,
+        "endLine": 13,
+        "content": "const id = url.pathname.split(\"/\").pop()"
+      }
+    ],
+    "OrderService": [
+      {
+        "name": "OrderService",
+        "kind": "class",
+        "file": "src\\services\\order-service.ts",
+        "startLine": 5,
+        "endLine": 14,
+        "content": "class OrderService {\n  constructor(private userService: UserService) {}\n\n  async createOrder(userId: string, amount: number): Promise<Order> {\n    const user = await this.userService.getUser(userId)\n    if (!user) throw new Error(\"User not found\")\n    const result = await query(\"INSERT INTO orders ...\", [userId, amount])\n    return new Order(result.id, user, amount)\n  }\n}",
+        "exportKind": "none"
+      },
+      {
+        "name": "OrderService",
+        "kind": "class",
+        "file": "src\\services\\order-service.ts",
+        "startLine": 5,
+        "endLine": 14,
+        "content": "class OrderService {\n  constructor(private userService: UserService) {}\n\n  async createOrder(userId: string, amount: number): Promise<Order> {\n    const user = await this.userService.getUser(userId)\n    if (!user) throw new Error(\"User not found\")\n    const result = await query(\"INSERT INTO orders ...\", [userId, amount])\n    return new Order(result.id, user, amount)\n  }\n}",
+        "exportKind": "none"
+      }
+    ],
+    "createOrder": [
+      {
+        "name": "createOrder",
+        "kind": "method",
+        "file": "src\\services\\order-service.ts",
+        "startLine": 8,
+        "endLine": 13,
+        "content": "async createOrder(userId: string, amount: number): Promise<Order> {\n    const user = await this.userService.getUser(userId)\n    if (!user) throw new Error(\"User not found\")\n    const result = await query(\"INSERT INTO orders ...\", [userId, amount])\n    return new Order(result.id, user, amount)\n  }",
+        "parentName": "OrderService",
+        "parameters": [
+          "userId",
+          "amount"
+        ],
+        "exportKind": "named"
+      },
+      {
+        "name": "createOrder",
+        "kind": "method",
+        "file": "src\\services\\order-service.ts",
+        "startLine": 8,
+        "endLine": 13,
+        "content": "async createOrder(userId: string, amount: number): Promise<Order> {\n    const user = await this.userService.getUser(userId)\n    if (!user) throw new Error(\"User not found\")\n    const result = await query(\"INSERT INTO orders ...\", [userId, amount])\n    return new Order(result.id, user, amount)\n  }",
+        "parentName": "OrderService",
+        "parameters": [
+          "userId",
+          "amount"
+        ]
+      }
+    ],
+    "UserService": [
+      {
+        "name": "UserService",
+        "kind": "class",
+        "file": "src\\services\\user-service.ts",
+        "startLine": 4,
+        "endLine": 14,
+        "content": "class UserService {\n  async createUser(name: string, email: string): Promise<User> {\n    const result = await query(\"INSERT INTO users ...\", [name, email])\n    return new User(result.id, name, email)\n  }\n\n  async getUser(id: string): Promise<User | null> {\n    const result = await query(\"SELECT * FROM users WHERE id = ?\", [id])\n    return result ? new User(result.id, result.name, result.email) : null\n  }\n}",
+        "exportKind": "none"
+      },
+      {
+        "name": "UserService",
+        "kind": "class",
+        "file": "src\\services\\user-service.ts",
+        "startLine": 4,
+        "endLine": 14,
+        "content": "class UserService {\n  async createUser(name: string, email: string): Promise<User> {\n    const result = await query(\"INSERT INTO users ...\", [name, email])\n    return new User(result.id, name, email)\n  }\n\n  async getUser(id: string): Promise<User | null> {\n    const result = await query(\"SELECT * FROM users WHERE id = ?\", [id])\n    return result ? new User(result.id, result.name, result.email) : null\n  }\n}",
+        "exportKind": "none"
+      }
+    ],
+    "createUser": [
+      {
+        "name": "createUser",
+        "kind": "method",
+        "file": "src\\services\\user-service.ts",
+        "startLine": 5,
+        "endLine": 8,
+        "content": "async createUser(name: string, email: string): Promise<User> {\n    const result = await query(\"INSERT INTO users ...\", [name, email])\n    return new User(result.id, name, email)\n  }",
+        "parentName": "UserService",
+        "parameters": [
+          "name",
+          "email"
+        ]
+      },
+      {
+        "name": "createUser",
+        "kind": "method",
+        "file": "src\\services\\user-service.ts",
+        "startLine": 5,
+        "endLine": 8,
+        "content": "async createUser(name: string, email: string): Promise<User> {\n    const result = await query(\"INSERT INTO users ...\", [name, email])\n    return new User(result.id, name, email)\n  }",
+        "parentName": "UserService",
+        "parameters": [
+          "name",
+          "email"
+        ]
+      }
+    ],
+    "getUser": [
+      {
+        "name": "getUser",
+        "kind": "method",
+        "file": "src\\services\\user-service.ts",
+        "startLine": 10,
+        "endLine": 13,
+        "content": "async getUser(id: string): Promise<User | null> {\n    const result = await query(\"SELECT * FROM users WHERE id = ?\", [id])\n    return result ? new User(result.id, result.name, result.email) : null\n  }",
+        "parentName": "UserService",
+        "parameters": [
+          "id"
+        ],
+        "exportKind": "named"
+      },
+      {
+        "name": "getUser",
+        "kind": "method",
+        "file": "src\\services\\user-service.ts",
+        "startLine": 10,
+        "endLine": 13,
+        "content": "async getUser(id: string): Promise<User | null> {\n    const result = await query(\"SELECT * FROM users WHERE id = ?\", [id])\n    return result ? new User(result.id, result.name, result.email) : null\n  }",
+        "parentName": "UserService",
+        "parameters": [
+          "id"
+        ]
+      }
+    ],
+    "query": [
+      {
+        "name": "query",
+        "kind": "function",
+        "file": "src\\utils\\db.ts",
+        "startLine": 1,
+        "endLine": 5,
+        "content": "async function query(sql: string, params?: any[]): Promise<any> {\n  // 数据库查询实现\n  console.log(\"Executing SQL:\", sql, params)\n  return {}\n}",
+        "parameters": [
+          "sql"
+        ],
+        "exportKind": "named"
+      },
+      {
+        "name": "query",
+        "kind": "function",
+        "file": "src\\utils\\db.ts",
+        "startLine": 1,
+        "endLine": 5,
+        "content": "async function query(sql: string, params?: any[]): Promise<any> {\n  // 数据库查询实现\n  console.log(\"Executing SQL:\", sql, params)\n  return {}\n}",
+        "parameters": [
+          "sql"
+        ],
+        "exportKind": "none"
+      }
+    ],
+    "service": [
+      {
+        "name": "service",
+        "kind": "variable",
+        "file": "test\\user-service.test.ts",
+        "startLine": 7,
+        "endLine": 7,
+        "content": "const service = new UserService()"
+      }
+    ]
+  },
+  "references": {},
+  "blocks": [
+    {
+      "file": "src\\models\\order.ts",
+      "startLine": 3,
+      "endLine": 9,
+      "content": "class Order {\n  constructor(\n    public id: string,\n    public user: User,\n    public amount: number\n  ) {}\n}",
+      "symbols": [
+        {
+          "name": "Order",
+          "kind": "class",
+          "file": "src\\models\\order.ts",
+          "startLine": 3,
+          "endLine": 9,
+          "content": "class Order {\n  constructor(\n    public id: string,\n    public user: User,\n    public amount: number\n  ) {}\n}",
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\models\\order.ts",
+      "startLine": 4,
+      "endLine": 8,
+      "content": "constructor(\n    public id: string,\n    public user: User,\n    public amount: number\n  ) {}",
+      "symbols": [
+        {
+          "name": "constructor",
+          "kind": "method",
+          "file": "src\\models\\order.ts",
+          "startLine": 4,
+          "endLine": 8,
+          "content": "constructor(\n    public id: string,\n    public user: User,\n    public amount: number\n  ) {}",
+          "parentName": "Order",
+          "parameters": [
+            "id",
+            "user",
+            "amount"
+          ],
+          "exportKind": "named"
+        }
+      ]
+    },
+    {
+      "file": "src\\models\\order.ts",
+      "startLine": 3,
+      "endLine": 9,
+      "content": "class Order {\n  constructor(\n    public id: string,\n    public user: User,\n    public amount: number\n  ) {}\n}",
+      "symbols": [
+        {
+          "name": "Order",
+          "kind": "class",
+          "file": "src\\models\\order.ts",
+          "startLine": 3,
+          "endLine": 9,
+          "content": "class Order {\n  constructor(\n    public id: string,\n    public user: User,\n    public amount: number\n  ) {}\n}",
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\models\\order.ts",
+      "startLine": 4,
+      "endLine": 8,
+      "content": "constructor(\n    public id: string,\n    public user: User,\n    public amount: number\n  ) {}",
+      "symbols": [
+        {
+          "name": "constructor",
+          "kind": "method",
+          "file": "src\\models\\order.ts",
+          "startLine": 4,
+          "endLine": 8,
+          "content": "constructor(\n    public id: string,\n    public user: User,\n    public amount: number\n  ) {}",
+          "parentName": "Order",
+          "parameters": [
+            "id",
+            "user",
+            "amount"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src\\models\\user.ts",
+      "startLine": 1,
+      "endLine": 7,
+      "content": "class User {\n  constructor(\n    public id: string,\n    public name: string,\n    public email: string\n  ) {}\n}",
+      "symbols": [
+        {
+          "name": "User",
+          "kind": "class",
+          "file": "src\\models\\user.ts",
+          "startLine": 1,
+          "endLine": 7,
+          "content": "class User {\n  constructor(\n    public id: string,\n    public name: string,\n    public email: string\n  ) {}\n}",
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\models\\user.ts",
+      "startLine": 2,
+      "endLine": 6,
+      "content": "constructor(\n    public id: string,\n    public name: string,\n    public email: string\n  ) {}",
+      "symbols": [
+        {
+          "name": "constructor",
+          "kind": "method",
+          "file": "src\\models\\user.ts",
+          "startLine": 2,
+          "endLine": 6,
+          "content": "constructor(\n    public id: string,\n    public name: string,\n    public email: string\n  ) {}",
+          "parentName": "User",
+          "parameters": [
+            "id",
+            "name",
+            "email"
+          ],
+          "exportKind": "named"
+        }
+      ]
+    },
+    {
+      "file": "src\\models\\user.ts",
+      "startLine": 1,
+      "endLine": 7,
+      "content": "class User {\n  constructor(\n    public id: string,\n    public name: string,\n    public email: string\n  ) {}\n}",
+      "symbols": [
+        {
+          "name": "User",
+          "kind": "class",
+          "file": "src\\models\\user.ts",
+          "startLine": 1,
+          "endLine": 7,
+          "content": "class User {\n  constructor(\n    public id: string,\n    public name: string,\n    public email: string\n  ) {}\n}",
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\models\\user.ts",
+      "startLine": 2,
+      "endLine": 6,
+      "content": "constructor(\n    public id: string,\n    public name: string,\n    public email: string\n  ) {}",
+      "symbols": [
+        {
+          "name": "constructor",
+          "kind": "method",
+          "file": "src\\models\\user.ts",
+          "startLine": 2,
+          "endLine": 6,
+          "content": "constructor(\n    public id: string,\n    public name: string,\n    public email: string\n  ) {}",
+          "parentName": "User",
+          "parameters": [
+            "id",
+            "name",
+            "email"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\order-routes.ts",
+      "startLine": 4,
+      "endLine": 4,
+      "content": "const userService = new UserService()",
+      "symbols": [
+        {
+          "name": "userService",
+          "kind": "variable",
+          "file": "src\\routes\\order-routes.ts",
+          "startLine": 4,
+          "endLine": 4,
+          "content": "const userService = new UserService()"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\order-routes.ts",
+      "startLine": 5,
+      "endLine": 5,
+      "content": "const orderService = new OrderService(userService)",
+      "symbols": [
+        {
+          "name": "orderService",
+          "kind": "variable",
+          "file": "src\\routes\\order-routes.ts",
+          "startLine": 5,
+          "endLine": 5,
+          "content": "const orderService = new OrderService(userService)"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\order-routes.ts",
+      "startLine": 7,
+      "endLine": 11,
+      "content": "async function handleCreateOrder(req: Request) {\n  const { userId, amount } = await req.json()\n  const order = await orderService.createOrder(userId, amount)\n  return new Response(JSON.stringify(order))\n}",
+      "symbols": [
+        {
+          "name": "handleCreateOrder",
+          "kind": "function",
+          "file": "src\\routes\\order-routes.ts",
+          "startLine": 7,
+          "endLine": 11,
+          "content": "async function handleCreateOrder(req: Request) {\n  const { userId, amount } = await req.json()\n  const order = await orderService.createOrder(userId, amount)\n  return new Response(JSON.stringify(order))\n}",
+          "parameters": [
+            "req"
+          ],
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\order-routes.ts",
+      "startLine": 9,
+      "endLine": 9,
+      "content": "const order = await orderService.createOrder(userId, amount)",
+      "symbols": [
+        {
+          "name": "order",
+          "kind": "variable",
+          "file": "src\\routes\\order-routes.ts",
+          "startLine": 9,
+          "endLine": 9,
+          "content": "const order = await orderService.createOrder(userId, amount)",
+          "exportKind": "named"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\order-routes.ts",
+      "startLine": 7,
+      "endLine": 11,
+      "content": "async function handleCreateOrder(req: Request) {\n  const { userId, amount } = await req.json()\n  const order = await orderService.createOrder(userId, amount)\n  return new Response(JSON.stringify(order))\n}",
+      "symbols": [
+        {
+          "name": "handleCreateOrder",
+          "kind": "function",
+          "file": "src\\routes\\order-routes.ts",
+          "startLine": 7,
+          "endLine": 11,
+          "content": "async function handleCreateOrder(req: Request) {\n  const { userId, amount } = await req.json()\n  const order = await orderService.createOrder(userId, amount)\n  return new Response(JSON.stringify(order))\n}",
+          "parameters": [
+            "req"
+          ],
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\order-routes.ts",
+      "startLine": 9,
+      "endLine": 9,
+      "content": "const order = await orderService.createOrder(userId, amount)",
+      "symbols": [
+        {
+          "name": "order",
+          "kind": "variable",
+          "file": "src\\routes\\order-routes.ts",
+          "startLine": 9,
+          "endLine": 9,
+          "content": "const order = await orderService.createOrder(userId, amount)"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 3,
+      "endLine": 3,
+      "content": "const userService = new UserService()",
+      "symbols": [
+        {
+          "name": "userService",
+          "kind": "variable",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 3,
+          "endLine": 3,
+          "content": "const userService = new UserService()"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 5,
+      "endLine": 9,
+      "content": "async function handleCreateUser(req: Request) {\n  const { name, email } = await req.json()\n  const user = await userService.createUser(name, email)\n  return new Response(JSON.stringify(user))\n}",
+      "symbols": [
+        {
+          "name": "handleCreateUser",
+          "kind": "function",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 5,
+          "endLine": 9,
+          "content": "async function handleCreateUser(req: Request) {\n  const { name, email } = await req.json()\n  const user = await userService.createUser(name, email)\n  return new Response(JSON.stringify(user))\n}",
+          "parameters": [
+            "req"
+          ],
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 7,
+      "endLine": 7,
+      "content": "const user = await userService.createUser(name, email)",
+      "symbols": [
+        {
+          "name": "user",
+          "kind": "variable",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 7,
+          "endLine": 7,
+          "content": "const user = await userService.createUser(name, email)",
+          "exportKind": "named"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 5,
+      "endLine": 9,
+      "content": "async function handleCreateUser(req: Request) {\n  const { name, email } = await req.json()\n  const user = await userService.createUser(name, email)\n  return new Response(JSON.stringify(user))\n}",
+      "symbols": [
+        {
+          "name": "handleCreateUser",
+          "kind": "function",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 5,
+          "endLine": 9,
+          "content": "async function handleCreateUser(req: Request) {\n  const { name, email } = await req.json()\n  const user = await userService.createUser(name, email)\n  return new Response(JSON.stringify(user))\n}",
+          "parameters": [
+            "req"
+          ],
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 7,
+      "endLine": 7,
+      "content": "const user = await userService.createUser(name, email)",
+      "symbols": [
+        {
+          "name": "user",
+          "kind": "variable",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 7,
+          "endLine": 7,
+          "content": "const user = await userService.createUser(name, email)"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 11,
+      "endLine": 18,
+      "content": "async function handleGetUser(req: Request) {\n  const url = new URL(req.url)\n  const id = url.pathname.split(\"/\").pop()\n  if (!id) return new Response(\"Missing id\", { status: 400 })\n  const user = await userService.getUser(id)\n  if (!user) return new Response(\"Not found\", { status: 404 })\n  return new Response(JSON.stringify(user))\n}",
+      "symbols": [
+        {
+          "name": "handleGetUser",
+          "kind": "function",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 11,
+          "endLine": 18,
+          "content": "async function handleGetUser(req: Request) {\n  const url = new URL(req.url)\n  const id = url.pathname.split(\"/\").pop()\n  if (!id) return new Response(\"Missing id\", { status: 400 })\n  const user = await userService.getUser(id)\n  if (!user) return new Response(\"Not found\", { status: 404 })\n  return new Response(JSON.stringify(user))\n}",
+          "parameters": [
+            "req"
+          ],
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 12,
+      "endLine": 12,
+      "content": "const url = new URL(req.url)",
+      "symbols": [
+        {
+          "name": "url",
+          "kind": "variable",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 12,
+          "endLine": 12,
+          "content": "const url = new URL(req.url)"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 13,
+      "endLine": 13,
+      "content": "const id = url.pathname.split(\"/\").pop()",
+      "symbols": [
+        {
+          "name": "id",
+          "kind": "variable",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 13,
+          "endLine": 13,
+          "content": "const id = url.pathname.split(\"/\").pop()"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 15,
+      "endLine": 15,
+      "content": "const user = await userService.getUser(id)",
+      "symbols": [
+        {
+          "name": "user",
+          "kind": "variable",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 15,
+          "endLine": 15,
+          "content": "const user = await userService.getUser(id)",
+          "exportKind": "named"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 11,
+      "endLine": 18,
+      "content": "async function handleGetUser(req: Request) {\n  const url = new URL(req.url)\n  const id = url.pathname.split(\"/\").pop()\n  if (!id) return new Response(\"Missing id\", { status: 400 })\n  const user = await userService.getUser(id)\n  if (!user) return new Response(\"Not found\", { status: 404 })\n  return new Response(JSON.stringify(user))\n}",
+      "symbols": [
+        {
+          "name": "handleGetUser",
+          "kind": "function",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 11,
+          "endLine": 18,
+          "content": "async function handleGetUser(req: Request) {\n  const url = new URL(req.url)\n  const id = url.pathname.split(\"/\").pop()\n  if (!id) return new Response(\"Missing id\", { status: 400 })\n  const user = await userService.getUser(id)\n  if (!user) return new Response(\"Not found\", { status: 404 })\n  return new Response(JSON.stringify(user))\n}",
+          "parameters": [
+            "req"
+          ],
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 12,
+      "endLine": 12,
+      "content": "const url = new URL(req.url)",
+      "symbols": [
+        {
+          "name": "url",
+          "kind": "variable",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 12,
+          "endLine": 12,
+          "content": "const url = new URL(req.url)"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 13,
+      "endLine": 13,
+      "content": "const id = url.pathname.split(\"/\").pop()",
+      "symbols": [
+        {
+          "name": "id",
+          "kind": "variable",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 13,
+          "endLine": 13,
+          "content": "const id = url.pathname.split(\"/\").pop()"
+        }
+      ]
+    },
+    {
+      "file": "src\\routes\\user-routes.ts",
+      "startLine": 15,
+      "endLine": 15,
+      "content": "const user = await userService.getUser(id)",
+      "symbols": [
+        {
+          "name": "user",
+          "kind": "variable",
+          "file": "src\\routes\\user-routes.ts",
+          "startLine": 15,
+          "endLine": 15,
+          "content": "const user = await userService.getUser(id)"
+        }
+      ]
+    },
+    {
+      "file": "src\\services\\order-service.ts",
+      "startLine": 5,
+      "endLine": 14,
+      "content": "class OrderService {\n  constructor(private userService: UserService) {}\n\n  async createOrder(userId: string, amount: number): Promise<Order> {\n    const user = await this.userService.getUser(userId)\n    if (!user) throw new Error(\"User not found\")\n    const result = await query(\"INSERT INTO orders ...\", [userId, amount])\n    return new Order(result.id, user, amount)\n  }\n}",
+      "symbols": [
+        {
+          "name": "OrderService",
+          "kind": "class",
+          "file": "src\\services\\order-service.ts",
+          "startLine": 5,
+          "endLine": 14,
+          "content": "class OrderService {\n  constructor(private userService: UserService) {}\n\n  async createOrder(userId: string, amount: number): Promise<Order> {\n    const user = await this.userService.getUser(userId)\n    if (!user) throw new Error(\"User not found\")\n    const result = await query(\"INSERT INTO orders ...\", [userId, amount])\n    return new Order(result.id, user, amount)\n  }\n}",
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\services\\order-service.ts",
+      "startLine": 6,
+      "endLine": 6,
+      "content": "constructor(private userService: UserService) {}",
+      "symbols": [
+        {
+          "name": "constructor",
+          "kind": "method",
+          "file": "src\\services\\order-service.ts",
+          "startLine": 6,
+          "endLine": 6,
+          "content": "constructor(private userService: UserService) {}",
+          "parentName": "OrderService",
+          "parameters": [
+            "userService"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src\\services\\order-service.ts",
+      "startLine": 8,
+      "endLine": 13,
+      "content": "async createOrder(userId: string, amount: number): Promise<Order> {\n    const user = await this.userService.getUser(userId)\n    if (!user) throw new Error(\"User not found\")\n    const result = await query(\"INSERT INTO orders ...\", [userId, amount])\n    return new Order(result.id, user, amount)\n  }",
+      "symbols": [
+        {
+          "name": "createOrder",
+          "kind": "method",
+          "file": "src\\services\\order-service.ts",
+          "startLine": 8,
+          "endLine": 13,
+          "content": "async createOrder(userId: string, amount: number): Promise<Order> {\n    const user = await this.userService.getUser(userId)\n    if (!user) throw new Error(\"User not found\")\n    const result = await query(\"INSERT INTO orders ...\", [userId, amount])\n    return new Order(result.id, user, amount)\n  }",
+          "parentName": "OrderService",
+          "parameters": [
+            "userId",
+            "amount"
+          ],
+          "exportKind": "named"
+        }
+      ]
+    },
+    {
+      "file": "src\\services\\order-service.ts",
+      "startLine": 5,
+      "endLine": 14,
+      "content": "class OrderService {\n  constructor(private userService: UserService) {}\n\n  async createOrder(userId: string, amount: number): Promise<Order> {\n    const user = await this.userService.getUser(userId)\n    if (!user) throw new Error(\"User not found\")\n    const result = await query(\"INSERT INTO orders ...\", [userId, amount])\n    return new Order(result.id, user, amount)\n  }\n}",
+      "symbols": [
+        {
+          "name": "OrderService",
+          "kind": "class",
+          "file": "src\\services\\order-service.ts",
+          "startLine": 5,
+          "endLine": 14,
+          "content": "class OrderService {\n  constructor(private userService: UserService) {}\n\n  async createOrder(userId: string, amount: number): Promise<Order> {\n    const user = await this.userService.getUser(userId)\n    if (!user) throw new Error(\"User not found\")\n    const result = await query(\"INSERT INTO orders ...\", [userId, amount])\n    return new Order(result.id, user, amount)\n  }\n}",
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\services\\order-service.ts",
+      "startLine": 6,
+      "endLine": 6,
+      "content": "constructor(private userService: UserService) {}",
+      "symbols": [
+        {
+          "name": "constructor",
+          "kind": "method",
+          "file": "src\\services\\order-service.ts",
+          "startLine": 6,
+          "endLine": 6,
+          "content": "constructor(private userService: UserService) {}",
+          "parentName": "OrderService",
+          "parameters": [
+            "userService"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src\\services\\order-service.ts",
+      "startLine": 8,
+      "endLine": 13,
+      "content": "async createOrder(userId: string, amount: number): Promise<Order> {\n    const user = await this.userService.getUser(userId)\n    if (!user) throw new Error(\"User not found\")\n    const result = await query(\"INSERT INTO orders ...\", [userId, amount])\n    return new Order(result.id, user, amount)\n  }",
+      "symbols": [
+        {
+          "name": "createOrder",
+          "kind": "method",
+          "file": "src\\services\\order-service.ts",
+          "startLine": 8,
+          "endLine": 13,
+          "content": "async createOrder(userId: string, amount: number): Promise<Order> {\n    const user = await this.userService.getUser(userId)\n    if (!user) throw new Error(\"User not found\")\n    const result = await query(\"INSERT INTO orders ...\", [userId, amount])\n    return new Order(result.id, user, amount)\n  }",
+          "parentName": "OrderService",
+          "parameters": [
+            "userId",
+            "amount"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src\\services\\user-service.ts",
+      "startLine": 4,
+      "endLine": 14,
+      "content": "class UserService {\n  async createUser(name: string, email: string): Promise<User> {\n    const result = await query(\"INSERT INTO users ...\", [name, email])\n    return new User(result.id, name, email)\n  }\n\n  async getUser(id: string): Promise<User | null> {\n    const result = await query(\"SELECT * FROM users WHERE id = ?\", [id])\n    return result ? new User(result.id, result.name, result.email) : null\n  }\n}",
+      "symbols": [
+        {
+          "name": "UserService",
+          "kind": "class",
+          "file": "src\\services\\user-service.ts",
+          "startLine": 4,
+          "endLine": 14,
+          "content": "class UserService {\n  async createUser(name: string, email: string): Promise<User> {\n    const result = await query(\"INSERT INTO users ...\", [name, email])\n    return new User(result.id, name, email)\n  }\n\n  async getUser(id: string): Promise<User | null> {\n    const result = await query(\"SELECT * FROM users WHERE id = ?\", [id])\n    return result ? new User(result.id, result.name, result.email) : null\n  }\n}",
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\services\\user-service.ts",
+      "startLine": 5,
+      "endLine": 8,
+      "content": "async createUser(name: string, email: string): Promise<User> {\n    const result = await query(\"INSERT INTO users ...\", [name, email])\n    return new User(result.id, name, email)\n  }",
+      "symbols": [
+        {
+          "name": "createUser",
+          "kind": "method",
+          "file": "src\\services\\user-service.ts",
+          "startLine": 5,
+          "endLine": 8,
+          "content": "async createUser(name: string, email: string): Promise<User> {\n    const result = await query(\"INSERT INTO users ...\", [name, email])\n    return new User(result.id, name, email)\n  }",
+          "parentName": "UserService",
+          "parameters": [
+            "name",
+            "email"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src\\services\\user-service.ts",
+      "startLine": 10,
+      "endLine": 13,
+      "content": "async getUser(id: string): Promise<User | null> {\n    const result = await query(\"SELECT * FROM users WHERE id = ?\", [id])\n    return result ? new User(result.id, result.name, result.email) : null\n  }",
+      "symbols": [
+        {
+          "name": "getUser",
+          "kind": "method",
+          "file": "src\\services\\user-service.ts",
+          "startLine": 10,
+          "endLine": 13,
+          "content": "async getUser(id: string): Promise<User | null> {\n    const result = await query(\"SELECT * FROM users WHERE id = ?\", [id])\n    return result ? new User(result.id, result.name, result.email) : null\n  }",
+          "parentName": "UserService",
+          "parameters": [
+            "id"
+          ],
+          "exportKind": "named"
+        }
+      ]
+    },
+    {
+      "file": "src\\services\\user-service.ts",
+      "startLine": 4,
+      "endLine": 14,
+      "content": "class UserService {\n  async createUser(name: string, email: string): Promise<User> {\n    const result = await query(\"INSERT INTO users ...\", [name, email])\n    return new User(result.id, name, email)\n  }\n\n  async getUser(id: string): Promise<User | null> {\n    const result = await query(\"SELECT * FROM users WHERE id = ?\", [id])\n    return result ? new User(result.id, result.name, result.email) : null\n  }\n}",
+      "symbols": [
+        {
+          "name": "UserService",
+          "kind": "class",
+          "file": "src\\services\\user-service.ts",
+          "startLine": 4,
+          "endLine": 14,
+          "content": "class UserService {\n  async createUser(name: string, email: string): Promise<User> {\n    const result = await query(\"INSERT INTO users ...\", [name, email])\n    return new User(result.id, name, email)\n  }\n\n  async getUser(id: string): Promise<User | null> {\n    const result = await query(\"SELECT * FROM users WHERE id = ?\", [id])\n    return result ? new User(result.id, result.name, result.email) : null\n  }\n}",
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "src\\services\\user-service.ts",
+      "startLine": 5,
+      "endLine": 8,
+      "content": "async createUser(name: string, email: string): Promise<User> {\n    const result = await query(\"INSERT INTO users ...\", [name, email])\n    return new User(result.id, name, email)\n  }",
+      "symbols": [
+        {
+          "name": "createUser",
+          "kind": "method",
+          "file": "src\\services\\user-service.ts",
+          "startLine": 5,
+          "endLine": 8,
+          "content": "async createUser(name: string, email: string): Promise<User> {\n    const result = await query(\"INSERT INTO users ...\", [name, email])\n    return new User(result.id, name, email)\n  }",
+          "parentName": "UserService",
+          "parameters": [
+            "name",
+            "email"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src\\services\\user-service.ts",
+      "startLine": 10,
+      "endLine": 13,
+      "content": "async getUser(id: string): Promise<User | null> {\n    const result = await query(\"SELECT * FROM users WHERE id = ?\", [id])\n    return result ? new User(result.id, result.name, result.email) : null\n  }",
+      "symbols": [
+        {
+          "name": "getUser",
+          "kind": "method",
+          "file": "src\\services\\user-service.ts",
+          "startLine": 10,
+          "endLine": 13,
+          "content": "async getUser(id: string): Promise<User | null> {\n    const result = await query(\"SELECT * FROM users WHERE id = ?\", [id])\n    return result ? new User(result.id, result.name, result.email) : null\n  }",
+          "parentName": "UserService",
+          "parameters": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "src\\utils\\db.ts",
+      "startLine": 1,
+      "endLine": 5,
+      "content": "async function query(sql: string, params?: any[]): Promise<any> {\n  // 数据库查询实现\n  console.log(\"Executing SQL:\", sql, params)\n  return {}\n}",
+      "symbols": [
+        {
+          "name": "query",
+          "kind": "function",
+          "file": "src\\utils\\db.ts",
+          "startLine": 1,
+          "endLine": 5,
+          "content": "async function query(sql: string, params?: any[]): Promise<any> {\n  // 数据库查询实现\n  console.log(\"Executing SQL:\", sql, params)\n  return {}\n}",
+          "parameters": [
+            "sql"
+          ],
+          "exportKind": "named"
+        }
+      ]
+    },
+    {
+      "file": "src\\utils\\db.ts",
+      "startLine": 1,
+      "endLine": 5,
+      "content": "async function query(sql: string, params?: any[]): Promise<any> {\n  // 数据库查询实现\n  console.log(\"Executing SQL:\", sql, params)\n  return {}\n}",
+      "symbols": [
+        {
+          "name": "query",
+          "kind": "function",
+          "file": "src\\utils\\db.ts",
+          "startLine": 1,
+          "endLine": 5,
+          "content": "async function query(sql: string, params?: any[]): Promise<any> {\n  // 数据库查询实现\n  console.log(\"Executing SQL:\", sql, params)\n  return {}\n}",
+          "parameters": [
+            "sql"
+          ],
+          "exportKind": "none"
+        }
+      ]
+    },
+    {
+      "file": "test\\user-service.test.ts",
+      "startLine": 7,
+      "endLine": 7,
+      "content": "const service = new UserService()",
+      "symbols": [
+        {
+          "name": "service",
+          "kind": "variable",
+          "file": "test\\user-service.test.ts",
+          "startLine": 7,
+          "endLine": 7,
+          "content": "const service = new UserService()"
+        }
+      ]
+    },
+    {
+      "file": "test\\user-service.test.ts",
+      "startLine": 8,
+      "endLine": 8,
+      "content": "const user = await service.createUser(\"test\", \"test@example.com\")",
+      "symbols": [
+        {
+          "name": "user",
+          "kind": "variable",
+          "file": "test\\user-service.test.ts",
+          "startLine": 8,
+          "endLine": 8,
+          "content": "const user = await service.createUser(\"test\", \"test@example.com\")"
+        }
+      ]
+    }
+  ],
+  "files": [
+    "src\\models\\order.ts",
+    "src\\models\\user.ts",
+    "src\\routes\\order-routes.ts",
+    "src\\routes\\user-routes.ts",
+    "src\\services\\order-service.ts",
+    "src\\services\\user-service.ts",
+    "src\\utils\\db.ts",
+    "test\\user-service.test.ts"
+  ]
+}

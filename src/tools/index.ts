@@ -15,6 +15,7 @@ import { runCommandTool } from './run-command.js'
 import { webFetchTool } from './web-fetch.js'
 import { webSearchTool } from './web-search.js'
 import { writeFileTool } from './write-file.js'
+import { codeIndexTools } from '../code-index/tools.js'
 
 function summarizeServerEndpoint(config: McpServerConfig): string {
   const remoteUrl = config.url?.trim()
@@ -63,6 +64,7 @@ export async function createDefaultToolRegistry(args: {
     createLoadSkillTool(args.cwd),
     webFetchTool,
     webSearchTool,
+    ...codeIndexTools,
   ], {
     skills,
     mcpServers: buildConnectingMcpSummaries(mcpServers),
