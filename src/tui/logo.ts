@@ -99,7 +99,7 @@ export function renderInputPanel(
   const before = text.slice(0, offset)
   const cursor = text[offset] ?? ' '
   const after = text.slice(Math.min(offset + 1, text.length))
-  const inputContent = GREEN + BOLD + '>' + RESET + ' ' + before + REVERSE + cursor + RESET + after
+  const inputContent = GREEN + BOLD + '>' + RESET + before + cursor + after
 
   // Brand row: PowerCode left, model+ctx right
   const left = applyGradient('PowerCode')

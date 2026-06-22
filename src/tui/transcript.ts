@@ -13,6 +13,7 @@ const MAGENTA = '[35m'
 const BOLD = '[1m'
 const BLUE = '[34m'
 const REVERSE = '[7m'
+const BRIGHT_GREEN = '[92m'
 const DEEP_BLUE = '[38;5;24m'  // deep blue for user bar
 const USER_BG = '[48;5;254m'  // light gray bg for user messages
 const BLACK = '[30m'  // black text for user messages
@@ -186,7 +187,51 @@ function renderTranscriptEntry(entry: TranscriptEntry): string {
           ? `${DIM}collapsing${'.'.repeat(entry.collapsePhase)}${RESET}`
           : previewToolBody(entry.toolName, renderMarkdownish(entry.body))
 
-  return `${MAGENTA}${BOLD}tool${RESET} ${entry.toolName} ${status}\n${indentBlock(body)}`
+  const icon = entry.status === 'success'
+    ? `${GREEN}✓${RESET}`
+    : entry.status === 'error'
+      ? `${RED}✗${RESET}`
+      : `${YELLOW}⏳ running${RESET}`
+  const durationColor = entry.status === 'error' ? RED : GREEN
+  const durationStr = entry.duration !== undefined
+    ? ` ${durationColor}${entry.duration}ms${RESET}`
+    : ''
+  const durationPlain = entry.duration !== undefined
+    ? ` ${entry.duration}ms`
+    : ''
+  const iconPlain = entry.status === 'success' ? '✓' : entry.status === 'error' ? '✗' : '⏳ running'
+
+  // 固定宽度，避免运行中和完成后宽度变化导致闪烁
+  const contentLines = body.split('\n')
+  const boxInnerWidth = 50
+
+  // 顶行: ┌─ name ── icon duration ─┐
+  // 总宽度 = boxInnerWidth + 2 (左右边框)
+  // header 内容: ┌─ name ── icon duration ─┐
+  const headerRight = `${icon}${durationStr}`
+  const headerRightPlain = `${iconPlain}${durationPlain}`
+  const usedWidth = entry.toolName.length + headerRightPlain.length + 6  // ┌─ name ── ... ─┐
+  const headerDash = Math.max(1, boxInnerWidth - usedWidth)
+  const header = `${DIM}┌─ ${BOLD}${entry.toolName}${RESET}${DIM} ${'─'.repeat(headerDash)} ${headerRight} ${DIM}─┐${RESET}`
+
+  // 内容行: │  content  │  每行总宽度 = boxInnerWidth + 2
+  const rows = contentLines.map(line => {
+    let w = displayWidth(line)
+    let displayLine = line
+    // 截断超长内容
+    if (w > boxInnerWidth - 3) {
+      displayLine = line.slice(0, boxInnerWidth - 6) + '...'
+      w = boxInnerWidth - 3
+    }
+    const pad = Math.max(0, boxInnerWidth - w - 1)
+    return `${DIM}│${RESET} ${displayLine}${' '.repeat(pad)}${DIM}│${RESET}`
+  })
+
+  // 底行: └──────────┘  总宽度 = boxInnerWidth + 2
+  const footer = `${DIM}└${'─'.repeat(boxInnerWidth)}┘${RESET}`
+
+  const bar = `${BLUE}│${RESET} `
+  return [`${bar}${header}`, ...rows.map(l => `${bar}${l}`), `${bar}${footer}`].join('\n')
 }
 
 function getTranscriptPanelWidth(): number {
@@ -203,13 +248,11 @@ export function getTranscriptWindowSize(windowSize?: number): number {
 
 export function renderTranscriptLines(entries: TranscriptEntry[]): string[] {
   const rendered = entries.map(renderTranscriptEntry)
-  const separator = `${BLUE}${DIM}·${RESET}`
+  const separator = `${DIM}${'─'.repeat(40)}${RESET}`
   const logicalLines: string[] = []
 
   rendered.forEach((block, index) => {
     if (index > 0) {
-      logicalLines.push('')
-      logicalLines.push(separator)
       logicalLines.push('')
     }
 

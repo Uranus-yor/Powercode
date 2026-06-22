@@ -23,4 +23,5 @@ export type TranscriptEntry =
       collapsed?: boolean
       collapsedSummary?: string
       collapsePhase?: 1 | 2 | 3
+      duration?: number
     }

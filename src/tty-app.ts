@@ -52,6 +52,7 @@ import {
   renderTranscript,
   getTranscriptMaxScrollOffset,
   showCursor,
+  hideCursor,
   extractSelectedText,
   renderTranscriptLines,
   getTranscriptWindowSize,
@@ -663,11 +664,13 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
       }
     }
 
-    const totalLines = parts.reduce((sum, p) => sum + p.split('\n').length, 0)
-    const inputRow = totalLines - 4 - startupMenuLineCount
+    // parts 结构: [verticalPad..., logo, inputPanel, menuLines...]
+    // 输入面板之前的行数 = verticalPad + logo 的行数
+    const linesBeforeInputPanel = verticalPad + renderCenteredLogo(terminalWidth).split('\n').length
+    const inputRow = linesBeforeInputPanel + 2  // +2: border + input 行（1-indexed）
     const inputText = state.input ?? ''
     const beforeCursor = inputText.slice(0, Math.min(state.cursorOffset, inputText.length))
-    const cursorCol = centeredLeftPad + 5 + stringDisplayWidth(beforeCursor)
+    const cursorCol = centeredLeftPad + 4 + stringDisplayWidth(beforeCursor)
     flushFrame(parts, { row: inputRow, col: cursorCol })
     return
   }
@@ -713,11 +716,15 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
     parts.push(menuStr)
   }
 
-  const totalLines = parts.reduce((sum, p) => sum + p.split('\n').length, 0)
-  const inputRow = totalLines - 4 - menuLineCount
+  // 计算光标位置
+  // parts 结构: [transcript, '', inputPanel, menu?]
+  // 输入面板之前有 transcript(0) + ''(1) 两个元素
+  // 输入面板内：border(0) + input(1) + empty(2) + brand(3) + border(4)
+  const linesBeforeInputPanel = (parts[0] ?? '').split('\n').length + 1  // transcript + ''
+  const inputRow = linesBeforeInputPanel + 2  // +2: 跳过 border 到 input 行（1-indexed）
   const inputText = state.input ?? ''
   const beforeCursor = inputText.slice(0, Math.min(state.cursorOffset, inputText.length))
-  const cursorCol = leftPad + 5 + stringDisplayWidth(beforeCursor)
+  const cursorCol = leftPad + 4 + stringDisplayWidth(beforeCursor)
   flushFrame(parts, { row: inputRow, col: cursorCol })
 }
 
@@ -1255,6 +1262,7 @@ async function handleInput(
   const pendingToolEntries = new Map<string, number[]>()
   const aggregatedEditByKey = new Map<string, AggregatedEditProgress>()
   const aggregatedEditByEntryId = new Map<number, AggregatedEditProgress>()
+  const toolStartTimes = new Map<number, number>()
 
   args.permissions.beginTurn()
   try {
@@ -1379,16 +1387,14 @@ async function handleInput(
             aggregatedEditByEntryId.set(entryId, progress)
           }
         } else {
-          entryId = pushTranscriptEntry(state, {
-            kind: 'tool',
-            toolName,
-            status: 'running',
-            body: summarizeToolInput(toolName, toolInput),
-          })
+          // 不在 transcript 中创建 running 状态的条目
+          // 只记录 entryId，等工具完成后再创建
+          entryId = -Date.now()  // 临时 ID
         }
         const pending = pendingToolEntries.get(toolName) ?? []
         pending.push(entryId)
         pendingToolEntries.set(toolName, pending)
+        toolStartTimes.set(entryId, Date.now())
         state.transcriptScrollOffset = 0
         rerender()
       },
@@ -1438,15 +1444,22 @@ async function handleInput(
               name: toolName,
               status: isError ? 'error' : 'success',
             })
-            updateToolEntry(
-              state,
-              entryId,
-              isError ? 'error' : 'success',
-              isError ? `ERROR: ${output}` : output,
-            )
+            // 计算耗时
+            const startTime = toolStartTimes.get(entryId)
+            const duration = startTime !== undefined ? Date.now() - startTime : undefined
+            if (startTime !== undefined) toolStartTimes.delete(entryId)
+
+            // 创建工具条目（完成后才创建，避免运行中闪烁）
+            const newEntryId = pushTranscriptEntry(state, {
+              kind: 'tool',
+              toolName,
+              status: isError ? 'error' : 'success',
+              body: isError ? `ERROR: ${output}` : output,
+              duration,
+            })
             collapseToolEntry(
               state,
-              entryId,
+              newEntryId,
               summarizeCollapsedToolBody(
                 isError ? `ERROR: ${output}` : output,
               ),
@@ -1969,7 +1982,7 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
             state.selection = null
             return
           }
-          const col = Math.max(0, screenX - 3)  // panel: │(1) + space(1), content starts at screen col 3
+          const col = Math.max(0, screenX - 3)
 
           if (event.action === 'press' && event.button === 'left') {
             state.mouseDown = { x: col, y: lineIndex }
@@ -2000,7 +2013,36 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
               endLine,
               endCol,
             }
-            renderScreen(permissionArgs, state)
+
+            // 增量更新：只重写 transcript 面板区域
+            const terminalWidth = process.stdout.columns ?? 80
+            const panelContent = renderPanel(
+              'session feed',
+              renderTranscript(
+                state.transcript,
+                state.transcriptScrollOffset,
+                state.transcriptBodyLines,
+                state.selection ?? undefined,
+              ),
+              {
+                rightTitle: `${state.transcript.length} events`,
+                minBodyLines: state.transcriptBodyLines,
+                width: terminalWidth,
+              },
+            )
+            const panelHeight = state.transcriptBodyLines + 4  // border + title + empty + body + border
+
+            hideCursor()
+            // 清除旧面板区域（从第 1 行开始）
+            for (let i = 0; i < panelHeight; i++) {
+              moveCursorTo(1 + i, 1)
+              process.stdout.write('\x1b[2K')
+            }
+            // 写入新面板（从第 1 行开始）
+            moveCursorTo(1, 1)
+            process.stdout.write(panelContent)
+            showCursor()
+
             return
           }
 
