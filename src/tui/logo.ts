@@ -118,9 +118,9 @@ export function renderInputPanel(
   const helpText = `${DIM}Enter${RESET} send ${DIM}\u00b7${RESET} ${DIM}/help${RESET} commands ${DIM}\u00b7${RESET} ${DIM}Esc${RESET} clear ${DIM}\u00b7${RESET} ${DIM}Ctrl+C${RESET} exit`
 
   if (statusParts) {
-    result.push(`${pad}  ${statusParts}  ${DIM}\u2502${RESET}  ${helpText}`)
+    result.push(`${pad}${statusParts}  ${DIM}\u2502${RESET}  ${helpText}`)
   } else {
-    result.push(`${pad}  ${helpText}`)
+    result.push(`${pad}${helpText}`)
   }
 
   return result.join('\n')
