@@ -4,26 +4,19 @@ import process from 'node:process'
 import type { RuntimeConfig } from '../config.js'
 import type { SlashCommand } from '../cli-commands.js'
 import type { PermissionRequest } from '../permissions.js'
+import {
+  RESET, DIM, BOLD, REVERSE,
+  BORDER,
+  STATUS_SUCCESS, STATUS_ERROR, STATUS_WARNING, STATUS_RUNNING,
+  ACCENT_PRIMARY,
+  BRIGHT_CYAN, BRIGHT_RED, BRIGHT_GREEN, BRIGHT_YELLOW,
+  CYAN, GREEN, YELLOW, BLUE, MAGENTA,
+  colorBadge,
+} from './colors.js'
 
-const RESET = '\u001b[0m'
-const DIM = '\u001b[2m'
-const CYAN = '\u001b[36m'
-const GREEN = '\u001b[32m'
-const YELLOW = '\u001b[33m'
-const RED = '\u001b[31m'
-const BLUE = '\u001b[34m'
-const MAGENTA = '\u001b[35m'
-const BOLD = '\u001b[1m'
-const REVERSE = '\u001b[7m'
-const BRIGHT_GREEN = '\u001b[92m'
-const BRIGHT_RED = '\u001b[91m'
-const BRIGHT_CYAN = '\u001b[96m'
-const BRIGHT_YELLOW = '\u001b[93m'
-const BORDER = '\u001b[2m'
-
-function stripAnsi(input: string): string {
-  return input.replace(/\u001b\[[0-9;]*m/g, '')
-}
+// ═══════════════════════════════════════════════════════════════
+// 字符宽度计算
+// ═══════════════════════════════════════════════════════════════
 
 export function charDisplayWidth(char: string): number {
   const code = char.codePointAt(0)
@@ -56,9 +49,16 @@ export function stringDisplayWidth(input: string): number {
   return [...stripAnsi(input)].reduce((sum, char) => sum + charDisplayWidth(char), 0)
 }
 
-/** 计算字符串的显示宽度（别名，与 stringDisplayWidth 相同） */
 export function displayWidth(str: string): number {
   return stringDisplayWidth(str)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 文本处理工具
+// ═══════════════════════════════════════════════════════════════
+
+function stripAnsi(input: string): string {
+  return input.replace(/\u001b\[[0-9;]*m/g, '')
 }
 
 function truncatePlain(input: string, width: number): string {
@@ -111,14 +111,6 @@ function truncatePathMiddle(input: string, width: number): string {
   return `${left}...${right}`
 }
 
-function colorBadge(
-  label: string,
-  value: string,
-  color: string,
-): string {
-  return `${color}[${label}]${RESET} ${BOLD}${value}${RESET}`
-}
-
 function joinSegmentsWithinWidth(
   segments: string[],
   separator: string,
@@ -151,58 +143,140 @@ function joinSegmentsWithinWidth(
   return output
 }
 
-function borderLine(kind: 'top' | 'bottom', width: number): string {
+// ═══════════════════════════════════════════════════════════════
+// 边框样式系统
+// ═══════════════════════════════════════════════════════════════
+
+/** 圆角边框字符集 */
+const BORDER_CHARS = {
+  topLeft: '╭',
+  topRight: '╮',
+  bottomLeft: '╰',
+  bottomRight: '╯',
+  horizontal: '─',
+  vertical: '│',
+} as const
+
+/** 创建顶部边框线 */
+function _borderLineTop(width: number): string {
   const inner = Math.max(0, width - 2)
-  if (kind === 'top') {
-    return `${BORDER}╭${'─'.repeat(inner)}╮${RESET}`
+  return `${BORDER}${BORDER_CHARS.topLeft}${BORDER_CHARS.horizontal.repeat(inner)}${BORDER_CHARS.topRight}${RESET}`
+}
+
+/** 创建底部边框线 */
+function borderLineBottom(width: number): string {
+  const inner = Math.max(0, width - 2)
+  return `${BORDER}${BORDER_CHARS.bottomLeft}${BORDER_CHARS.horizontal.repeat(inner)}${BORDER_CHARS.bottomRight}${RESET}`
+}
+
+/** 创建带标题的顶部边框线 */
+function borderLineTopWithTitle(width: number, title: string, rightTitle?: string): string {
+  const inner = Math.max(0, width - 2)
+  const titleStr = ` ${BOLD}${title}${RESET}${BORDER} `
+  const titleWidth = stringDisplayWidth(title) + 2
+
+  let rightStr = ''
+  let rightWidth = 0
+  if (rightTitle) {
+    const truncated = truncatePlain(rightTitle, Math.max(10, Math.floor(width * 0.3)))
+    rightStr = ` ${DIM}${truncated}${RESET}${BORDER} `
+    rightWidth = stringDisplayWidth(truncated) + 2
   }
-  return `${BORDER}╰${'─'.repeat(inner)}╯${RESET}`
+
+  const dashCount = Math.max(0, inner - titleWidth - rightWidth)
+  const dashes = BORDER_CHARS.horizontal.repeat(dashCount)
+
+  return `${BORDER}${BORDER_CHARS.topLeft}${titleStr}${dashes}${rightStr}${BORDER_CHARS.topRight}${RESET}`
 }
 
-function panelRow(left: string, width: number, right?: string): string {
+/** 创建面板行 */
+function panelRow(content: string, width: number): string {
   const inner = Math.max(0, width - 4)
-  const rightText = right ?? ''
-  const leftWidth = stringDisplayWidth(left)
-  const rightWidth = stringDisplayWidth(rightText)
-  const gap = Math.max(rightText ? 1 : 0, inner - leftWidth - rightWidth)
-  const leftText =
-    leftWidth + rightWidth + gap > inner
-      ? truncatePlain(left, Math.max(0, inner - rightWidth - 1))
-      : left
-  return `${BORDER}│${RESET} ${leftText}${' '.repeat(
-    Math.max(0, inner - stringDisplayWidth(leftText) - rightWidth),
-  )}${rightText} ${BORDER}│${RESET}`
+  const contentWidth = stringDisplayWidth(content)
+  const padding = Math.max(0, inner - contentWidth)
+  return `${BORDER}${BORDER_CHARS.vertical}${RESET} ${content}${' '.repeat(padding)} ${BORDER}${BORDER_CHARS.vertical}${RESET}`
 }
 
+/** 创建空面板行 */
 function emptyPanelRow(width: number): string {
-  return `${BORDER}│${RESET}${' '.repeat(Math.max(0, width - 2))}${BORDER}│${RESET}`
+  return `${BORDER}${BORDER_CHARS.vertical}${RESET}${' '.repeat(Math.max(0, width - 2))}${BORDER}${BORDER_CHARS.vertical}${RESET}`
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 面板包裹
+// ═══════════════════════════════════════════════════════════════
 
 export function wrapPanelBodyLine(line: string, width: number): string[] {
   const inner = Math.max(0, width - 4)
   if (inner <= 0) return ['']
+
+  const hasAnsi = /\u001b\[[0-9;]*m/.test(line)
+  if (!hasAnsi) {
+    if (stringDisplayWidth(line) <= inner) return [line]
+    const parts: string[] = []
+    let current = ''
+    let currentWidth = 0
+    for (const char of [...line]) {
+      const charWidth = charDisplayWidth(char)
+      if (currentWidth + charWidth > inner) {
+        parts.push(current)
+        current = char
+        currentWidth = charWidth
+        continue
+      }
+      current += char
+      currentWidth += charWidth
+    }
+    if (current.length > 0) parts.push(current)
+    return parts
+  }
+
   const plain = stripAnsi(line)
   if (stringDisplayWidth(plain) <= inner) return [line]
+
   const parts: string[] = []
-  let current = ''
+  let plainIdx = 0
+  let lineIdx = 0
   let currentWidth = 0
-  for (const char of [...plain]) {
-    const charWidth = charDisplayWidth(char)
-    if (currentWidth + charWidth > inner) {
-      parts.push(current)
-      current = char
-      currentWidth = charWidth
+  let partStart = 0
+
+  while (plainIdx < plain.length && lineIdx < line.length) {
+    const ansiMatch = line.slice(lineIdx).match(/^\u001b\[[0-9;]*m/)
+    if (ansiMatch) {
+      lineIdx += ansiMatch[0].length
       continue
     }
-    current += char
+
+    const char = plain[plainIdx]
+    const charWidth = charDisplayWidth(char)
+
+    if (currentWidth + charWidth > inner) {
+      parts.push(line.slice(partStart, lineIdx))
+      partStart = lineIdx
+      currentWidth = 0
+      continue
+    }
+
     currentWidth += charWidth
+    plainIdx++
+    lineIdx++
   }
-  if (current.length > 0) {
-    parts.push(current)
+
+  if (lineIdx > partStart) {
+    parts.push(line.slice(partStart))
   }
-  return parts
+
+  return parts.length > 0 ? parts : ['']
 }
 
+/**
+ * 渲染面板组件
+ * 
+ * @param title - 面板标题
+ * @param body - 面板内容
+ * @param options - 配置选项
+ * @returns 渲染后的面板字符串
+ */
 export function renderPanel(
   title: string,
   body: string,
@@ -221,20 +295,18 @@ export function renderPanel(
   }
 
   return [
-    borderLine('top', width),
-    panelRow(
-      `${BRIGHT_CYAN}${BOLD}${title}${RESET}`,
-      width,
-      options.rightTitle
-        ? `${DIM}${truncatePlain(options.rightTitle, Math.max(10, Math.floor(width * 0.3)))}${RESET}`
-        : undefined,
-    ),
+    borderLineTopWithTitle(width, title, options.rightTitle),
     emptyPanelRow(width),
     ...renderedLines.map(line => panelRow(line, width)),
-    borderLine('bottom', width),
+    borderLineBottom(width),
   ].join('\n')
 }
 
+// ═══════════════════════════════════════════════════════════════
+// 状态指示器
+// ═══════════════════════════════════════════════════════════════
+
+/** 渲染上下文使用率徽章 */
 export function renderContextBadge(stats: {
   utilization: number
   warningLevel: 'normal' | 'warning' | 'critical' | 'blocked'
@@ -248,9 +320,9 @@ export function renderContextBadge(stats: {
   const percent = Math.round(utilization * 100)
 
   const colorMap = {
-    normal: GREEN,
-    warning: YELLOW,
-    critical: RED,
+    normal: STATUS_SUCCESS,
+    warning: STATUS_WARNING,
+    critical: STATUS_ERROR,
     blocked: BRIGHT_RED,
   }
   const color = colorMap[warningLevel]
@@ -265,10 +337,14 @@ export function renderContextBadge(stats: {
         : accounting?.source === 'estimate_only'
           ? 'est'
           : ''
-  const suffix = sourceLabel ? ` ${sourceLabel}` : ''
+  const suffix = sourceLabel ? ` ${DIM}${sourceLabel}${RESET}` : ''
 
   return colorBadge('ctx', `${percent}% ${bar}${suffix}`, color)
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 顶部横幅
+// ═══════════════════════════════════════════════════════════════
 
 export function renderBanner(
   runtime: RuntimeConfig | null,
@@ -301,7 +377,7 @@ export function renderBanner(
     ? runtime.baseUrl.replace(/^https?:\/\//, '').split('/')[0] || 'custom'
     : 'offline'
   const pathBudget = Math.max(20, panelInner - 28)
-  const projectLine = `${BLUE}${BOLD}${truncatePlain(cwdName, 24)}${RESET} ${DIM}${truncatePathMiddle(cwd, pathBudget)}${RESET}`
+  const projectLine = `${ACCENT_PRIMARY}${BOLD}${truncatePlain(cwdName, 24)}${RESET} ${DIM}${truncatePathMiddle(cwd, pathBudget)}${RESET}`
   const permissionLine =
     permissionSummary.length > 0
       ? `${DIM}${truncatePlain(permissionSummary.join(' | '), Math.max(24, panelInner))}${RESET}`
@@ -343,9 +419,13 @@ export function renderBanner(
   )
 }
 
+// ═══════════════════════════════════════════════════════════════
+// 状态栏
+// ═══════════════════════════════════════════════════════════════
+
 export function renderStatusLine(status: string | null): string {
   if (!status) return `${DIM}Ready${RESET}`
-  return `${YELLOW}${BOLD}${status}${RESET}`
+  return `${STATUS_WARNING}${BOLD}${status}${RESET}`
 }
 
 export function renderToolPanel(
@@ -356,7 +436,7 @@ export function renderToolPanel(
   const items: string[] = []
 
   if (activeTool) {
-    items.push(`${YELLOW}running:${RESET} ${activeTool}`)
+    items.push(`${STATUS_RUNNING}running:${RESET} ${activeTool}`)
   }
 
   const runningBackground = backgroundTasks.filter(task => task.status === 'running')
@@ -374,7 +454,7 @@ export function renderToolPanel(
   }
 
   for (const tool of recentTools.slice(-5).reverse()) {
-    const status = tool.status === 'success' ? `${GREEN}ok${RESET}` : `${RED}err${RESET}`
+    const status = tool.status === 'success' ? `${STATUS_SUCCESS}ok${RESET}` : `${STATUS_ERROR}err${RESET}`
     items.push(`${status} ${tool.name}`)
   }
 
@@ -400,23 +480,27 @@ export function renderFooterBar(
   const runningBackground = backgroundTasks.filter(task => task.status === 'running')
   const backgroundSummary =
     runningBackground.length > 0
-      ? `${DIM}|${RESET} ${DIM}shells${RESET} ${BRIGHT_CYAN}${runningBackground.length}${RESET}`
+      ? `${DIM}│${RESET} ${DIM}shells${RESET} ${BRIGHT_CYAN}${runningBackground.length}${RESET}`
       : ''
   const mcpSummary =
     mcpStatus.total === 0
       ? `${DIM}mcp${RESET} ${DIM}none${RESET}`
       : mcpStatus.connecting > 0
-        ? `${DIM}mcp srv${RESET} ${YELLOW}${mcpStatus.connected}/${mcpStatus.total} ready, ${mcpStatus.connecting} connecting${mcpStatus.toolCount > 0 ? `, ${mcpStatus.toolCount} tools` : ''}${RESET}`
+        ? `${DIM}mcp srv${RESET} ${STATUS_RUNNING}${mcpStatus.connected}/${mcpStatus.total} ready, ${mcpStatus.connecting} connecting${mcpStatus.toolCount > 0 ? `, ${mcpStatus.toolCount} tools` : ''}${RESET}`
         : mcpStatus.error > 0
           ? `${DIM}mcp srv${RESET} ${BRIGHT_RED}${mcpStatus.connected}/${mcpStatus.total} ready, ${mcpStatus.error} err${mcpStatus.toolCount > 0 ? `, ${mcpStatus.toolCount} tools` : ''}${RESET}`
-          : `${DIM}mcp srv${RESET} ${GREEN}${mcpStatus.connected}/${mcpStatus.total} ready${mcpStatus.toolCount > 0 ? `, ${mcpStatus.toolCount} tools` : ''}${RESET}`
+          : `${DIM}mcp srv${RESET} ${STATUS_SUCCESS}${mcpStatus.connected}/${mcpStatus.total} ready${mcpStatus.toolCount > 0 ? `, ${mcpStatus.toolCount} tools` : ''}${RESET}`
   const compressionPart = compressionStatus
-    ? `${DIM}|${RESET} ${YELLOW}${compressionStatus}${RESET}`
+    ? `${DIM}│${RESET} ${STATUS_WARNING}${compressionStatus}${RESET}`
     : ''
-  const right = `${DIM}tools${RESET} ${toolsEnabled ? `${GREEN}on${RESET}` : `${RED}off${RESET}`} ${DIM}|${RESET} ${DIM}skills${RESET} ${skillsEnabled ? `${GREEN}on${RESET}` : `${RED}off${RESET}`} ${DIM}|${RESET} ${mcpSummary}${backgroundSummary}${compressionPart}`
-  const gap = Math.max(1, width - stripAnsi(left).length - stripAnsi(right).length)
+  const right = `${DIM}tools${RESET} ${toolsEnabled ? `${STATUS_SUCCESS}on${RESET}` : `${STATUS_ERROR}off${RESET}`} ${DIM}│${RESET} ${DIM}skills${RESET} ${skillsEnabled ? `${STATUS_SUCCESS}on${RESET}` : `${STATUS_ERROR}off${RESET}`} ${DIM}│${RESET} ${mcpSummary}${backgroundSummary}${compressionPart}`
+  const gap = Math.max(1, width - stringDisplayWidth(left) - stringDisplayWidth(right))
   return `${left}${' '.repeat(gap)}${right}`
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 斜杠命令菜单
+// ═══════════════════════════════════════════════════════════════
 
 export function renderSlashMenu(
   commands: SlashCommand[],
@@ -426,7 +510,6 @@ export function renderSlashMenu(
     return `${DIM}no matching slash commands${RESET}`
   }
 
-  // 按 category 分组，保持组内顺序
   const categoryOrder = ['Session', 'Info', 'File Ops', 'Context', 'Dev']
   const groups = new Map<string, SlashCommand[]>()
   for (const cmd of commands) {
@@ -435,7 +518,6 @@ export function renderSlashMenu(
     groups.set(cmd.category, list)
   }
 
-  // 构建渲染行，记录可选命令的索引
   const lines: string[] = []
   let commandIndex = 0
   const safeIndex = Math.min(selectedIndex, commands.length - 1)
@@ -444,8 +526,7 @@ export function renderSlashMenu(
     const cmds = groups.get(cat)
     if (!cmds || cmds.length === 0) continue
 
-    // 分组标题
-    lines.push(`${DIM}── ${cat} ────${RESET}`)
+    lines.push(`${DIM}── ${cat} ${'─'.repeat(Math.max(0, 30 - cat.length))}${RESET}`)
 
     for (const cmd of cmds) {
       const usage = padPlain(cmd.usage, 24)
@@ -458,7 +539,6 @@ export function renderSlashMenu(
     }
   }
 
-  // 处理未分类的命令（兜底）
   for (const cmd of commands) {
     if (!categoryOrder.includes(cmd.category)) {
       const usage = padPlain(cmd.usage, 24)
@@ -473,6 +553,10 @@ export function renderSlashMenu(
 
   return lines.join('\n')
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 权限提示
+// ═══════════════════════════════════════════════════════════════
 
 type PermissionPromptRenderOptions = {
   expanded?: boolean
@@ -562,7 +646,7 @@ export function renderPermissionPrompt(
   } = sliceVisibleDetails(detailLines, expanded, scrollOffset)
 
   const promptLines = [
-    `${YELLOW}${BOLD}Approval Required${RESET}`,
+    `${STATUS_WARNING}${BOLD}Approval Required${RESET}`,
     `${BOLD}${request.summary}${RESET}`,
     ...visibleDetailLines,
   ]
@@ -588,7 +672,7 @@ export function renderPermissionPrompt(
     '',
     ...(feedbackMode
       ? [
-          `${YELLOW}${BOLD}Reject With Guidance${RESET}`,
+          `${STATUS_WARNING}${BOLD}Reject With Guidance${RESET}`,
           `${DIM}Type feedback for model, Enter submit, Esc back${RESET}`,
           `> ${feedbackInput}`,
         ]
@@ -601,6 +685,10 @@ export function renderPermissionPrompt(
     `${DIM}Use Up/Down to select, Enter confirm, Esc deny once${RESET}`,
   ].join('\n')
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Diff 高亮
+// ═══════════════════════════════════════════════════════════════
 
 type DiffLineKind = 'meta' | 'add' | 'remove' | 'context'
 
@@ -730,7 +818,6 @@ function colorizeUnifiedDiffBlock(block: string): string {
     kind: classifyDiffLine(raw),
   }))
 
-  // Pair adjacent removed/added lines and emphasize changed word spans.
   for (let i = 0; i < styled.length; i += 1) {
     if (styled[i]?.kind !== 'remove') {
       continue
