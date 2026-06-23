@@ -108,9 +108,11 @@ export function renderFrame(lines: string[]): void {
 }
 
 /**
- * 重置缓冲区（用于全屏重绘，如终端大小变化后）
+ * 重置缓冲区并清除屏幕（用于全屏重绘，如终端大小变化后）
  */
 export function resetBuffer(): void {
+  // 清除整个屏幕并移动光标到左上角
+  process.stdout.write('\x1b[2J\x1b[H')
   previousFrame = []
   lastFrameLineCount = 0
 }

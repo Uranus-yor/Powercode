@@ -23,8 +23,10 @@ export {
   moveCursorTo,
   enableCursorBlink,
   stringDisplayWidth,
+  charDisplayWidth,
   forceFullRepaint,
   renderFrame,
+  resetBuffer,
 } from './tui/index.js'
 
 export type { TranscriptEntry } from './tui/index.js'

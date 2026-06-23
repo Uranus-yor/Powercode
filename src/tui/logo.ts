@@ -1,16 +1,14 @@
-import { charDisplayWidth } from "./chrome.js"
-// PowerCode Logo Module
-const DIM = '[2m'
-const RESET = '[0m'
-const GREEN = '[32m'
-const BOLD = '[1m'
-const REVERSE = '[7m'
+import { charDisplayWidth, stringDisplayWidth, renderDivider } from './chrome.js'
+import {
+  RESET, DIM, BOLD, REVERSE,
+  SUCCESS, ACCENT,
+  FG_DIM,
+  applyGradient, stripAnsi,
+} from './colors.js'
 
-const GRADIENT: string[] = [
-  '[38;5;24m', '[38;5;31m', '[38;5;38m',
-  '[38;5;45m', '[38;5;51m', '[38;5;87m',
-  '[38;5;123m', '[38;5;159m', '[38;5;195m',
-]
+// ═══════════════════════════════════════════════════════════════
+// Logo ASCII Art
+// ═══════════════════════════════════════════════════════════════
 
 const LOGO_ART: string[] = [
   '██████   ██████  ██     ██ ███████ ██████   ██████  ██████  ██████  ███████',
@@ -20,118 +18,124 @@ const LOGO_ART: string[] = [
   '██       ██████   ███ ███  ███████ ██   ██  ██████  ██████  ██████  ███████',
 ]
 
-function stripAnsi(str: string): string {
-  return str.replace(/\[[0-9;]*m/g, '')
-}
-
-function applyGradient(text: string): string {
-  const chars = [...text]
-  const result: string[] = []
-  const colorCount = GRADIENT.length
-  for (let i = 0; i < chars.length; i++) {
-    const colorIndex = Math.floor((i / chars.length) * colorCount)
-    const color = GRADIENT[Math.min(colorIndex, colorCount - 1)]
-    result.push(color + chars[i] + RESET)
-  }
-  return result.join('')
-}
-
-function centerText(text: string, terminalWidth: number): string {
-  const textWidth = stripAnsi(text).length
-  const padding = Math.max(0, Math.floor((terminalWidth - textWidth) / 2))
-  return ' '.repeat(padding) + text
-}
-
-// ── Panel primitives (dim/black borders) ──
-
-const BORDER_COLOR = '[2m'  // dim = dark gray/black on most terminals
-
-function borderLine(kind: 'top' | 'bottom', width: number): string {
-  const inner = Math.max(0, width - 2)
-  if (kind === 'top') return BORDER_COLOR + '╭' + '─'.repeat(inner) + '╮' + RESET
-  return BORDER_COLOR + '╰' + '─'.repeat(inner) + '╯' + RESET
-}
-
-function emptyRow(width: number): string {
-  return BORDER_COLOR + '│' + RESET + ' '.repeat(Math.max(0, width - 2)) + BORDER_COLOR + '│' + RESET
-}
-
-function contentRow(content: string, width: number, bg?: string): string {
-  // Structure: │(1) + space(1) + content + padding + │(1) = width
-  // So padding = width - 3 - visible
-  const plain = stripAnsi(content)
-  let visible = 0
-  for (const ch of plain) visible += charDisplayWidth(ch)
-  const pad = Math.max(0, width - 3 - visible)
-  const bgOpen = bg ?? ''
-  const bgClose = bg ? RESET : ''
-  return BORDER_COLOR + '│' + RESET + ' ' + bgOpen + content + ' '.repeat(pad) + bgClose + BORDER_COLOR + '│' + RESET
-}
-
-// ── Exported renderers ──
+// ═══════════════════════════════════════════════════════════════
+// 渲染居中Logo
+// ═══════════════════════════════════════════════════════════════
 
 export function renderCenteredLogo(terminalWidth: number): string {
   const lines: string[] = []
   lines.push('')
   for (const line of LOGO_ART) {
-    lines.push(centerText(applyGradient(line), terminalWidth))
+    const w = stripAnsi(line).length
+    const pad = Math.max(0, Math.floor((terminalWidth - w) / 2))
+    lines.push(' '.repeat(pad) + applyGradient(line))
   }
   lines.push('')
   return lines.join('\n')
 }
 
+// ═══════════════════════════════════════════════════════════════
+// 渲染输入面板 - 无边框设计
+// ═══════════════════════════════════════════════════════════════
+
 export function renderInputPanel(
   width: number,
-  leftPadOrTerminalWidth: number,
+  leftPad: number,
   modelName?: string,
   contextPercent?: number,
   input?: string,
   cursorOffset?: number,
 ): string {
-  // Support both direct leftPad (working state) and terminalWidth (startup)
-  const leftPad = leftPadOrTerminalWidth
   const pad = ' '.repeat(leftPad)
-  const inner = Math.max(0, width - 4)
+  const result: string[] = []
 
-  // Input row
-  const offset = Math.max(0, Math.min(cursorOffset ?? 0, (input ?? '').length))
+  // 分隔线
+  result.push(`${pad}${renderDivider(width)}`)
+
+  // 输入内容：支持多行显示
   const text = input ?? ''
-  const before = text.slice(0, offset)
-  const cursor = text[offset] ?? ' '
-  const after = text.slice(Math.min(offset + 1, text.length))
-  const inputContent = GREEN + BOLD + '>' + RESET + before + cursor + after
+  const offset = Math.max(0, Math.min(cursorOffset ?? 0, text.length))
+  const maxInputW = Math.max(0, width - 6)  // "> " 前缀 + 两侧 padding
 
-  // Brand row: PowerCode left, model+ctx right
-  const left = applyGradient('PowerCode')
-  const model = modelName ? DIM + modelName + RESET : ''
-  const ctx = contextPercent !== undefined ? contextPercent + '%' : '░░░░░░'
-  const right = model + '  ' + DIM + 'ctx' + RESET + ' ' + ctx
-  const rightLen = stripAnsi(right).length
-  const leftPadCount = Math.max(0, inner - rightLen - stripAnsi(left).length)
-  const brandContent = left + ' '.repeat(leftPadCount) + right
+  // 将输入文本按宽度换行
+  const lines: string[] = []
+  let currentLine = ''
+  let currentWidth = 0
+  let cursorLine = 0
+  let cursorColInLine = 0
+  let charIndex = 0
 
-  const rows = [
-    pad + borderLine('top', width),
-    pad + contentRow(inputContent, width),
-    pad + emptyRow(width),
-    pad + contentRow(brandContent, width),
-    pad + borderLine('bottom', width),
-  ]
-  return rows.join('\n')
+  for (const ch of [...text]) {
+    const cw = charDisplayWidth(ch)
+    if (currentWidth + cw > maxInputW && currentLine.length > 0) {
+      lines.push(currentLine)
+      currentLine = ''
+      currentWidth = 0
+    }
+    if (charIndex === offset) {
+      cursorLine = lines.length
+      cursorColInLine = currentWidth
+    }
+    currentLine += ch
+    currentWidth += cw
+    charIndex++
+  }
+  lines.push(currentLine)
+
+  // 如果光标在最后
+  if (charIndex === offset) {
+    cursorLine = lines.length - 1
+    cursorColInLine = currentWidth
+  }
+
+  // 如果没有输入，显示一行空的带光标
+  if (lines.length === 0) {
+    lines.push('')
+  }
+
+  // 渲染每一行
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? ''
+    if (i === cursorLine) {
+      // 光标所在行：插入光标
+      const before = line.slice(0, Math.min(offset, line.length))
+      const cursorCh = line[offset] ?? ' '
+      const after = line.slice(Math.min(offset + 1, line.length))
+      result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${before}${REVERSE}${cursorCh}${RESET}${after}`)
+    } else if (i === 0) {
+      // 第一行
+      result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${line}`)
+    } else {
+      // 后续行（续行）
+      result.push(`${pad}    ${line}`)
+    }
+  }
+
+  // 状态行: model · ctx · 快捷键
+  const model = modelName ? `${DIM}model${RESET} ${SUCCESS}${modelName}${RESET}` : ''
+  const ctx = contextPercent !== undefined ? `${DIM}ctx${RESET} ${ACCENT}${contextPercent}%${RESET}` : ''
+  const statusParts = [model, ctx].filter(Boolean).join(` ${DIM}\u00b7${RESET} `)
+  const helpText = `${DIM}Enter${RESET} send ${DIM}\u00b7${RESET} ${DIM}/help${RESET} commands ${DIM}\u00b7${RESET} ${DIM}Esc${RESET} clear ${DIM}\u00b7${RESET} ${DIM}Ctrl+C${RESET} exit`
+
+  if (statusParts) {
+    result.push(`${pad}  ${statusParts}  ${DIM}\u2502${RESET}  ${helpText}`)
+  } else {
+    result.push(`${pad}  ${helpText}`)
+  }
+
+  return result.join('\n')
 }
 
-export function renderTranscriptPanel(
-  content: string,
-  width: number,
-  terminalWidth: number,
-): string {
+/**
+ * 渲染会话面板（用于 session picker）
+ */
+export function renderTranscriptPanel(content: string, width: number, terminalWidth: number): string {
   const leftPad = Math.max(0, Math.floor((terminalWidth - width) / 2))
   const pad = ' '.repeat(leftPad)
-
-  const rows = [pad + borderLine('top', width)]
+  const result: string[] = []
+  result.push(`${pad}${renderDivider(width)}`)
   for (const line of content.split('\n')) {
-    rows.push(pad + contentRow(line, width))
+    result.push(`${pad}  ${line}`)
   }
-  rows.push(pad + borderLine('bottom', width))
-  return rows.join('\n')
+  return result.join('\n')
 }

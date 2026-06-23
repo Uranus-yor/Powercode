@@ -61,11 +61,14 @@ import {
   moveCursorTo,
   enableCursorBlink,
   stringDisplayWidth,
+  charDisplayWidth,
   renderFrame,
+  resetBuffer,
   type TranscriptEntry,
   type TranscriptSelection,
 } from './ui.js'
 import { renderCenteredLogo, renderInputPanel } from './tui/logo.js'
+import { RESET, DIM, WARNING } from './tui/colors.js'
 import type { RuntimeConfig } from './config.js'
 import type { ToolRegistry } from './tool.js'
 import type { ChatMessage, CompressionResult, ModelAdapter } from './types.js'
@@ -211,9 +214,11 @@ function getTranscriptBodyLines(_args: TtyAppArgs, state: ScreenState): number {
 }
 
 function getMaxTranscriptScrollOffset(args: TtyAppArgs, state: ScreenState): number {
+  const width = process.stdout.columns ?? 80
   return getTranscriptMaxScrollOffset(
     state.transcript,
     getTranscriptBodyLines(args, state),
+    width,
   )
 }
 
@@ -221,12 +226,13 @@ function screenToAbsoluteLineIndex(
   _args: TtyAppArgs,
   state: ScreenState,
   screenY: number,
+  width?: number,
 ): number {
   const bodyStartY = state.transcriptBodyStartY
   const bodyY = screenY - bodyStartY
   if (bodyY < 0) return -1
 
-  const lines = renderTranscriptLines(state.transcript)
+  const lines = renderTranscriptLines(state.transcript, width)
   const pageSize = getTranscriptWindowSize(state.transcriptBodyLines)
   const maxOffset = Math.max(0, lines.length - pageSize)
   const offset = Math.max(0, Math.min(state.transcriptScrollOffset, maxOffset))
@@ -568,7 +574,7 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
   const backgroundTasks = listBackgroundTasks()
   const parts: string[] = []
 
-  state.transcriptBodyStartY = 4  // panel: border(1) + title(1) + empty(1) + body starts here
+  state.transcriptBodyStartY = 1  // 顶部 padding(1) 行
   state.transcriptBodyLines = getTranscriptBodyLines(args, state)
 
   if (state.pendingApproval) {
@@ -635,20 +641,22 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
   const terminalWidth = process.stdout.columns ?? 80
 
   if (state.transcript.length === 0) {
-    // Startup: fixed-width centered panel (75 chars, matching PowerCode logo)
-    const startupPanelWidth = 75
-    const centeredLeftPad = Math.max(0, Math.floor((terminalWidth - startupPanelWidth) / 2))
+    // Startup: 自适应宽度，最大 75 字符
+    const maxWidth = Math.min(75, terminalWidth - 4)  // 两边留 2 字符边距
+    const centeredLeftPad = Math.max(0, Math.floor((terminalWidth - maxWidth) / 2))
 
     // Vertical centering
     const rows = Math.max(24, process.stdout.rows ?? 40)
-    const contentHeight = 7 + 5  // logo (7 lines) + input panel (5 lines)
+    const logoHeight = 7  // logo 7 行
+    const inputPanelHeight = 3  // 输入面板 3 行（分隔线 + 输入行 + 状态行）
+    const contentHeight = logoHeight + inputPanelHeight
     const verticalPad = Math.max(0, Math.floor((rows - contentHeight) / 2))
     for (let i = 0; i < verticalPad; i++) parts.push('')
 
     parts.push(
       renderCenteredLogo(terminalWidth),
       renderInputPanel(
-        startupPanelWidth,
+        maxWidth,
         centeredLeftPad,
         args.runtime?.model ?? 'not-configured',
         state.contextStats ? Math.round(state.contextStats.utilization * 100) : undefined,
@@ -659,7 +667,6 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
 
     // 斜杠菜单
     const startupCommands = getVisibleCommands(state.input)
-    let startupMenuLineCount = 0
     if (startupCommands.length > 0) {
       const menuStr = renderSlashMenu(
         startupCommands,
@@ -667,16 +674,14 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
       )
       const menuPad = ' '.repeat(centeredLeftPad)
       const menuLines = menuStr.split('\n')
-      startupMenuLineCount = menuLines.length
       for (const line of menuLines) {
         parts.push(menuPad + line)
       }
     }
 
-    // parts 结构: [verticalPad..., logo, inputPanel, menuLines...]
-    // 输入面板之前的行数 = verticalPad + logo 的行数
-    const linesBeforeInputPanel = verticalPad + renderCenteredLogo(terminalWidth).split('\n').length
-    const inputRow = linesBeforeInputPanel + 2  // +2: border + input 行（1-indexed）
+    // 计算光标位置
+    const linesBeforeInputPanel = verticalPad + logoHeight
+    const inputRow = linesBeforeInputPanel + 2  // +2: 分隔线 + 输入行（1-indexed）
     const inputText = state.input ?? ''
     const beforeCursor = inputText.slice(0, Math.min(state.cursorOffset, inputText.length))
     const cursorCol = centeredLeftPad + 4 + stringDisplayWidth(beforeCursor)
@@ -686,54 +691,102 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
 
   // Working state: full-width
   const leftPad = 0
+  const rows = Math.max(24, process.stdout.rows ?? 40)
 
-  parts.push(
-    renderPanel(
-      'session feed',
-      renderTranscript(
-        state.transcript,
-        state.transcriptScrollOffset,
-        getTranscriptBodyLines(args, state),
-        state.selection ?? undefined,
-      ),
-      {
-        rightTitle: `${state.transcript.length} events`,
-        minBodyLines: getTranscriptBodyLines(args, state),
-        width: terminalWidth,
-      },
-    ),
-    '',
-    renderInputPanel(
-      terminalWidth,
-      leftPad,
-      args.runtime?.model ?? 'not-configured',
-      state.contextStats ? Math.round(state.contextStats.utilization * 100) : undefined,
-      state.input,
-      state.cursorOffset,
-    ),
+  // 渲染 transcript 内容
+  const transcriptContent = renderTranscript(
+    state.transcript,
+    state.transcriptScrollOffset,
+    getTranscriptBodyLines(args, state),
+    state.selection ?? undefined,
+    terminalWidth,
+  )
+  const transcriptLines = transcriptContent.split('\n').length
+
+  // 渲染输入面板
+  const inputPanel = renderInputPanel(
+    terminalWidth,
+    leftPad,
+    args.runtime?.model ?? 'not-configured',
+    state.contextStats ? Math.round(state.contextStats.utilization * 100) : undefined,
+    state.input,
+    state.cursorOffset,
   )
 
-  // 斜杠菜单（在 flushFrame 之前，不加入 parts，单独计算行数）
+  // 运行动画提示（固定位置，不影响输入框位置）
+  let busyLine = ''
+  if (state.isBusy) {
+    const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+    const frame = spinnerFrames[Math.floor(Date.now() / 100) % spinnerFrames.length]
+    const toolInfo = state.activeTool ? ` ${DIM}\u00b7${RESET} ${state.activeTool}` : ''
+    busyLine = `  ${WARNING}${frame}${RESET} ${state.status ?? 'working'}${toolInfo}`
+  }
+
+  // 斜杠菜单
   const commands = getVisibleCommands(state.input)
-  let menuLineCount = 0
+  let menuContent = ''
+  let menuLines = 0
   if (commands.length > 0) {
-    const menuStr = renderSlashMenu(
+    menuContent = renderSlashMenu(
       commands,
       Math.min(state.selectedSlashIndex, commands.length - 1),
     )
-    menuLineCount = menuStr.split('\n').length
-    parts.push(menuStr)
+    menuLines = menuContent.split('\n').length
   }
 
-  // 计算光标位置
-  // parts 结构: [transcript, '', inputPanel, menu?]
-  // 输入面板之前有 transcript(0) + ''(1) 两个元素
-  // 输入面板内：border(0) + input(1) + empty(2) + brand(3) + border(4)
-  const linesBeforeInputPanel = (parts[0] ?? '').split('\n').length + 1  // transcript + ''
-  const inputRow = linesBeforeInputPanel + 2  // +2: 跳过 border 到 input 行（1-indexed）
+  // 输入面板行数（动态）
+  const inputPanelLines = inputPanel.split('\n').length
+
+  // 固定区域高度：busy动画(1) + 输入面板 + 底部padding(2) + 斜杠菜单
+  const bottomFixedLines = 1 + inputPanelLines + 2 + menuLines
+
+  // 顶部 padding
+  const topPadding = 1
+
+  // 计算需要填充的空行，把输入框推到底部
+  const usedLines = topPadding + transcriptLines + bottomFixedLines
+  const paddingLines = Math.max(0, rows - usedLines)
+
+  // 组装最终输出
+  for (let i = 0; i < topPadding; i++) parts.push('')  // 顶部 padding
+  parts.push(transcriptContent)
+  for (let i = 0; i < paddingLines; i++) parts.push('')  // 中间填充
+  parts.push(busyLine || '')  // busy 动画（固定位置，有或没有都占一行）
+  parts.push(inputPanel)
+  for (let i = 0; i < 2; i++) parts.push('')  // 底部 padding
+  if (menuContent) parts.push(menuContent)
+
+  // 计算光标位置（输入框支持多行）
   const inputText = state.input ?? ''
-  const beforeCursor = inputText.slice(0, Math.min(state.cursorOffset, inputText.length))
-  const cursorCol = leftPad + 4 + stringDisplayWidth(beforeCursor)
+  const offset = Math.max(0, Math.min(state.cursorOffset ?? 0, inputText.length))
+  const maxInputW = Math.max(1, terminalWidth - 6)
+
+  // 计算光标在哪一行
+  let cursorLineInPanel = 0
+  let cursorColInLine = 0
+  let currentWidth = 0
+  let charIdx = 0
+  for (const ch of [...inputText]) {
+    const cw = charDisplayWidth(ch)
+    if (currentWidth + cw > maxInputW && charIdx > 0) {
+      cursorLineInPanel++
+      currentWidth = 0
+    }
+    if (charIdx === offset) {
+      cursorColInLine = currentWidth
+      break
+    }
+    currentWidth += cw
+    charIdx++
+  }
+  if (charIdx === offset) {
+    cursorColInLine = currentWidth
+  }
+
+  // 输入面板从底部往上数的位置
+  const inputPanelStartRow = rows - 2 - menuLines - inputPanelLines
+  const inputRow = inputPanelStartRow + cursorLineInPanel + 1  // +1 因为第一行是分隔线
+  const cursorCol = leftPad + 6 + cursorColInLine  // "> " 前缀 + padding
   flushFrame(parts, { row: inputRow, col: cursorCol })
 }
 
@@ -1849,6 +1902,7 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
       if (resizeTimer) clearTimeout(resizeTimer)
       resizeTimer = setTimeout(() => {
         resizeTimer = null
+        resetBuffer()
         renderScreen(permissionArgs, state)
       }, 50)
     }
@@ -2174,7 +2228,8 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
         if (event.kind === 'text' && event.ctrl && event.text === 'c') {
           // If there's a selection, copy it; otherwise exit
           if (state.selection) {
-            const text = extractSelectedText(state.transcript, state.selection)
+            const copyWidth = process.stdout.columns ?? 80
+            const text = extractSelectedText(state.transcript, state.selection, copyWidth)
             if (text) {
               copyToClipboard(text)
             }
@@ -2201,13 +2256,18 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
         if (event.kind === 'mouse') {
           const screenX = event.x + 1
           const screenY = event.y + 1
-          const lineIndex = screenToAbsoluteLineIndex(permissionArgs, state, screenY)
+          const mouseTerminalWidth = process.stdout.columns ?? 80
+          const lineIndex = screenToAbsoluteLineIndex(permissionArgs, state, screenY, mouseTerminalWidth)
           if (lineIndex < 0) {
-            state.mouseDown = null
-            state.selection = null
+            if (state.mouseDown || state.selection) {
+              state.mouseDown = null
+              state.selection = null
+              renderScreen(permissionArgs, state)
+            }
             return
           }
-          const col = Math.max(0, screenX - 3)
+          // 列偏移：PAD(2) + 色条(2) = 4 字符偏移
+          const col = Math.max(0, screenX - 4)
 
           if (event.action === 'press' && event.button === 'left') {
             state.mouseDown = { x: col, y: lineIndex }
@@ -2239,35 +2299,7 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
               endCol,
             }
 
-            // 增量更新：只重写 transcript 面板区域
-            const terminalWidth = process.stdout.columns ?? 80
-            const panelContent = renderPanel(
-              'session feed',
-              renderTranscript(
-                state.transcript,
-                state.transcriptScrollOffset,
-                state.transcriptBodyLines,
-                state.selection ?? undefined,
-              ),
-              {
-                rightTitle: `${state.transcript.length} events`,
-                minBodyLines: state.transcriptBodyLines,
-                width: terminalWidth,
-              },
-            )
-            const panelHeight = state.transcriptBodyLines + 4  // border + title + empty + body + border
-
-            hideCursor()
-            // 清除旧面板区域（从第 1 行开始）
-            for (let i = 0; i < panelHeight; i++) {
-              moveCursorTo(1 + i, 1)
-              process.stdout.write('\x1b[2K')
-            }
-            // 写入新面板（从第 1 行开始）
-            moveCursorTo(1, 1)
-            process.stdout.write(panelContent)
-            showCursor()
-
+            renderScreen(permissionArgs, state)
             return
           }
 
