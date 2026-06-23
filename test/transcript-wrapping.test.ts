@@ -45,11 +45,16 @@ describe('transcript wrapping', () => {
 
   it('extracts text from a wrapped continuation row', () => {
     const entries = makeWrappedAssistantEntry()
+    // With indentBlock('  ') prefix on assistant entries:
+    // Line 0: '  ' + 58 a's = 60 chars
+    // Line 1: 60 a's
+    // Line 2: 48 a's + 'BCDEFG' = 54 chars
+    // BCDEFG starts at col 48 on line 2
     const selection: TranscriptSelection = {
-      startLine: 3,
-      startCol: 0,
-      endLine: 3,
-      endCol: 6,
+      startLine: 2,
+      startCol: 48,
+      endLine: 2,
+      endCol: 54,
     }
 
     const selected = withTerminalWidth(60, () => extractSelectedText(entries, selection))
@@ -57,4 +62,3 @@ describe('transcript wrapping', () => {
     assert.equal(selected, 'BCDEFG')
   })
 })
-
