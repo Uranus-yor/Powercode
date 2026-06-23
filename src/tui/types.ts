@@ -1,3 +1,5 @@
+import type { AgentStatus } from '../multi-agent/types.js'
+
 export type TranscriptEntry =
   | {
       id: number
@@ -24,4 +26,20 @@ export type TranscriptEntry =
       collapsedSummary?: string
       collapsePhase?: 1 | 2 | 3
       duration?: number
+    }
+  | {
+      id: number
+      kind: 'orchestrator'
+      body: string
+    }
+  | {
+      id: number
+      kind: 'agent_message'
+      agentId: string
+      body: string
+    }
+  | {
+      id: number
+      kind: 'agent_board'
+      agents: AgentStatus[]
     }

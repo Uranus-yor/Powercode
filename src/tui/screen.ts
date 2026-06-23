@@ -68,3 +68,49 @@ export function forceFullRepaint(): void {
   process.stdout.write("[2J[H")
   lastFrameLineCount = 0
 }
+
+// ========== 双缓冲渲染 ==========
+
+let previousFrame: string[] = []
+
+/**
+ * 双缓冲渲染：只更新变化的行，消除闪烁
+ * 对比上一帧，只写入变化的行
+ */
+export function renderFrame(lines: string[]): void {
+  const maxLines = Math.max(previousFrame.length, lines.length)
+
+  // 隐藏光标避免闪烁
+  process.stdout.write('\x1b[?25l')
+
+  for (let i = 0; i < maxLines; i++) {
+    const oldLine = previousFrame[i] ?? ''
+    const newLine = lines[i] ?? ''
+
+    if (oldLine === newLine) {
+      continue  // 跳过未变化的行
+    }
+
+    // 移动光标到第 i+1 行，写入新内容
+    process.stdout.write(`\x1b[${i + 1};1H`)
+    process.stdout.write('\x1b[2K')  // 清除整行
+    process.stdout.write(newLine)
+  }
+
+  // 如果新帧更短，清除多余行
+  for (let i = lines.length; i < previousFrame.length; i++) {
+    process.stdout.write(`\x1b[${i + 1};1H`)
+    process.stdout.write('\x1b[2K')
+  }
+
+  previousFrame = [...lines]
+  lastFrameLineCount = lines.length
+}
+
+/**
+ * 重置缓冲区（用于全屏重绘，如终端大小变化后）
+ */
+export function resetBuffer(): void {
+  previousFrame = []
+  lastFrameLineCount = 0
+}

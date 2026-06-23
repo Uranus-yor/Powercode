@@ -83,6 +83,7 @@ export type AgentLoopOptions = {
   cwd: string
   permissions?: PermissionManager
   maxSteps?: number
+  timeoutMs?: number
   modelName?: string
   onToolStart?: (toolName: string, input: unknown) => void
   onToolResult?: (toolName: string, output: string, isError: boolean) => void
@@ -94,6 +95,8 @@ export type AgentLoopOptions = {
   onContextStats?: (stats: ContextStats) => void
   contentReplacementState?: ContentReplacementState
   contextCollapseState?: ContextCollapseState
+  /** 外部设置的引用，当值变为 true 时，循环会在下一步注入总结提示后退出 */
+  shouldSummarize?: { value: boolean }
 }
 
 // ========== 主循环 ==========
@@ -108,6 +111,7 @@ export async function runAgentLoop(
     cwd,
     permissions,
     maxSteps,
+    timeoutMs,
     modelName,
     onToolStart,
     onToolResult,
@@ -119,6 +123,7 @@ export async function runAgentLoop(
     onContextStats,
     contentReplacementState,
     contextCollapseState,
+    shouldSummarize,
   } = options
 
   let messages = initialMessages
@@ -140,6 +145,30 @@ export async function runAgentLoop(
   }
 
   for (let step = 0; maxSteps == null || step < maxSteps; step++) {
+    // 外部信号：需要总结（超时触发）
+    if (shouldSummarize?.value) {
+      const summarizePrompt = '时间到了，请根据你目前已有的工具调用结果，立即输出最终总结。不要再调用任何工具。'
+      messages = [...messages, { role: 'user' as const, content: summarizePrompt }]
+      try {
+        const finalResponse = await model.next(messages)
+        if (finalResponse.type === 'assistant' && finalResponse.content) {
+          onAssistantMessage?.(finalResponse.content)
+          return [...messages, { role: 'assistant', content: finalResponse.content }]
+        }
+      } catch {
+        // 模型调用失败，走 fallback
+      }
+      // Fallback: 提取 tool_result
+      const toolResults = messages
+        .filter(m => m.role === 'tool_result')
+        .map(m => ('content' in m ? String(m.content) : ''))
+        .filter(Boolean)
+        .join('\n\n')
+      const fallback = toolResults || '超时，未能生成总结。'
+      onAssistantMessage?.(fallback)
+      return [...messages, { role: 'assistant', content: fallback }]
+    }
+
     // 更新 system prompt 中的日期信息
     if (messages[0]?.role === 'system') {
       const today = new Date().toISOString().split('T')[0]
@@ -438,14 +467,34 @@ export async function runAgentLoop(
     }
   }
 
-  // 达到最大步数
-  const maxStepContent = `达到最大工具步数限制，已停止当前回合。`
-  onAssistantMessage?.(maxStepContent)
+  // 达到最大步数 — 注入总结提示，让模型基于已有数据输出结果
+  const summarizePrompt = '你已达到最大步骤限制。请根据你目前已有的工具调用结果和数据，立即输出最终总结。不要再调用任何工具。'
+  const summaryMessages = [
+    ...messages,
+    { role: 'user' as const, content: summarizePrompt },
+  ]
+  try {
+    const finalResponse = await model.next(summaryMessages)
+    if (finalResponse.type === 'assistant' && finalResponse.content) {
+      onAssistantMessage?.(finalResponse.content)
+      return [...summaryMessages, { role: 'assistant', content: finalResponse.content }]
+    }
+  } catch {
+    // 模型调用失败，走 fallback
+  }
+  // Fallback: 提取所有 tool_result 作为输出
+  const toolResults = messages
+    .filter(m => m.role === 'tool_result')
+    .map(m => ('content' in m ? String(m.content) : ''))
+    .filter(Boolean)
+    .join('\n\n')
+  const fallbackContent = toolResults || '达到最大工具步数限制，已停止当前回合。'
+  onAssistantMessage?.(fallbackContent)
   return [
     ...messages,
     {
       role: 'assistant',
-      content: maxStepContent,
+      content: fallbackContent,
     },
   ]
 }

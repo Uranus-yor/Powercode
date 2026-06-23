@@ -24,7 +24,7 @@ import {
 
 const MAX_TITLE_LENGTH = 60
 
-type EventType = 'system' | 'user' | 'assistant' | 'thinking' | 'progress' | 'tool_call' | 'tool_result' | 'summary' | 'compact_boundary' | 'snip_boundary' | 'context_collapse' | 'rename'
+type EventType = 'system' | 'user' | 'assistant' | 'thinking' | 'progress' | 'tool_call' | 'tool_result' | 'summary' | 'compact_boundary' | 'snip_boundary' | 'context_collapse' | 'rename' | 'orchestrator' | 'agent_message' | 'agent_board'
 
 export type SnipBoundaryMetadata = {
   type: 'snip_boundary'

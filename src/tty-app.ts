@@ -39,8 +39,10 @@ import type { SessionMeta, ProjectMeta } from './session.js'
 import { spawn } from 'node:child_process'
 import { parseInputChunk, type ParsedInputEvent } from './tui/input-parser.js'
 import {
+  clearScreen,
   enterAlternateScreen,
   exitAlternateScreen,
+  finalizeFrame,
   getPermissionPromptMaxScrollOffset,
   renderBanner,
   renderFooterBar,
@@ -59,7 +61,7 @@ import {
   moveCursorTo,
   enableCursorBlink,
   stringDisplayWidth,
-  forceFullRepaint,
+  renderFrame,
   type TranscriptEntry,
   type TranscriptSelection,
 } from './ui.js'
@@ -81,6 +83,8 @@ import {
   createContentReplacementState,
   type ContentReplacementState,
 } from './utils/tool-result-storage.js'
+import { Orchestrator, AgentBoardManager } from './multi-agent/index.js'
+import type { AgentStatus, AgentEvent, TaskPlan } from './multi-agent/types.js'
 
 type TtyAppArgs = {
   runtime: RuntimeConfig | null
@@ -94,6 +98,7 @@ type TtyAppArgs = {
   sessionId: string
   alreadySavedCount: number
   resumeTarget?: string | 'picker'
+  agentBoardManager?: AgentBoardManager
 }
 
 type PendingApproval = {
@@ -139,6 +144,7 @@ type ScreenState = {
   transcriptBodyStartY: number
   transcriptBodyLines: number
   pendingStartupMessages: string[]
+  agentBoardManager: AgentBoardManager | null
 }
 
 type TranscriptEntryDraft =
@@ -146,6 +152,9 @@ type TranscriptEntryDraft =
   | Omit<Extract<TranscriptEntry, { kind: 'assistant' }>, 'id'>
   | Omit<Extract<TranscriptEntry, { kind: 'progress' }>, 'id'>
   | Omit<Extract<TranscriptEntry, { kind: 'tool' }>, 'id'>
+  | Omit<Extract<TranscriptEntry, { kind: 'orchestrator' }>, 'id'>
+  | Omit<Extract<TranscriptEntry, { kind: 'agent_message' }>, 'id'>
+  | Omit<Extract<TranscriptEntry, { kind: 'agent_board' }>, 'id'>
 
 function formatRelativeTime(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000)
@@ -729,9 +738,9 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
 }
 
 function flushFrame(parts: string[], cursorPos?: { row: number; col: number }): void {
-  forceFullRepaint()
   const frame = parts.join('\n')
-  process.stdout.write(frame)
+  const lines = frame.split('\n')
+  renderFrame(lines)
   if (cursorPos) {
     showCursor()
     moveCursorTo(cursorPos.row, cursorPos.col)
@@ -881,6 +890,118 @@ async function resumeSession(
     await loadContextCollapseState(args.cwd, sessionId) ??
     createContextCollapseState()
   state.transcriptScrollOffset = 0
+}
+
+async function handleMultiAgentInput(
+  args: TtyAppArgs,
+  state: ScreenState,
+  rerender: () => void,
+  input: string,
+  plan: TaskPlan,
+): Promise<void> {
+
+  state.isBusy = true
+  state.status = 'Orchestrating...'
+  state.agentBoardManager = new AgentBoardManager()
+  rerender()
+
+  const boardManager = state.agentBoardManager
+
+  pushTranscriptEntry(state, {
+    kind: 'orchestrator',
+    body: `Planning ${plan.tasks.length} tasks (${plan.strategy}, ${plan.outputMode}): ${plan.reason}`,
+  })
+
+  pushTranscriptEntry(state, {
+    kind: 'agent_board',
+    agents: boardManager.getAgents(),
+  })
+
+  rerender()
+
+  try {
+    const orchestrator = new Orchestrator({
+      cwd: args.cwd,
+      model: args.model,
+      tools: args.tools,
+      permissions: args.permissions,
+      modelName: args.runtime?.model,
+    })
+
+    const results = await orchestrator.execute(
+      plan,
+      (event: AgentEvent) => {
+        if (event.type === 'started') {
+          boardManager.addAgent(event.agentId, event.agentId, event.task)
+          boardManager.updateAgent(event.agentId, { status: 'running' })
+        } else if (event.type === 'completed') {
+          boardManager.updateAgent(event.agentId, {
+            status: 'done',
+            result_summary: event.result.output.slice(0, 100),
+          })
+        } else if (event.type === 'error') {
+          boardManager.updateAgent(event.agentId, { status: 'error' })
+        }
+
+        const boardEntry = state.transcript.find(e => e.kind === 'agent_board')
+        if (boardEntry && boardEntry.kind === 'agent_board') {
+          boardEntry.agents = boardManager.getAgents()
+        }
+
+        rerender()
+      },
+      (agents: AgentStatus[]) => {
+        const boardEntry = state.transcript.find(e => e.kind === 'agent_board')
+        if (boardEntry && boardEntry.kind === 'agent_board') {
+          boardEntry.agents = agents
+        }
+        rerender()
+      },
+    )
+
+    for (const result of results) {
+      if (result.success) {
+        pushTranscriptEntry(state, {
+          kind: 'agent_message',
+          agentId: result.agentId,
+          body: result.output,
+        })
+      } else {
+        pushTranscriptEntry(state, {
+          kind: 'agent_message',
+          agentId: result.agentId,
+          body: `Error: ${result.error ?? 'Unknown error'}`,
+        })
+      }
+    }
+
+    const summary = orchestrator.summarize(results)
+    pushTranscriptEntry(state, {
+      kind: 'orchestrator',
+      body: summary,
+    })
+
+    args.messages.push({
+      role: 'assistant',
+      content: summary,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    pushTranscriptEntry(state, {
+      kind: 'orchestrator',
+      body: `Error: ${message}`,
+    })
+    args.messages.push({
+      role: 'assistant',
+      content: `Multi-agent error: ${message}`,
+    })
+  } finally {
+    state.isBusy = false
+    state.status = null
+    state.agentBoardManager = null
+    state.transcriptScrollOffset = 0
+    rerender()
+  }
 }
 
 async function handleInput(
@@ -1228,6 +1349,32 @@ async function handleInput(
     return false
   }
 
+  if (input.startsWith('/multi')) {
+    const task = input.slice('/multi'.length).trim()
+    if (task) {
+      // Force multi-agent mode: decompose and execute directly
+      const { decomposeTask } = await import('./multi-agent/router.js')
+      const { plan, error } = await decomposeTask(task, args.model)
+      if (plan) {
+        args.messages.push({ role: 'user', content: task })
+        await handleMultiAgentInput(args, state, rerender, task, plan)
+        await saveSession(args.cwd, args.sessionId, args.messages, args.alreadySavedCount)
+        args.alreadySavedCount = args.messages.length - 1
+      } else {
+        pushTranscriptEntry(state, {
+          kind: 'assistant',
+          body: `任务拆分失败: ${error ?? '未知错误'}`,
+        })
+      }
+      return false
+    }
+    pushTranscriptEntry(state, {
+      kind: 'assistant',
+      body: '用法: /multi <任务描述>\n例如: /multi 审查 src/ 下所有模块的安全性',
+    })
+    return false
+  }
+
   if (input.startsWith('/')) {
     const matches = findMatchingSlashCommands(input)
     pushTranscriptEntry(state, {
@@ -1259,10 +1406,39 @@ async function handleInput(
   state.isBusy = true
   rerender()
 
+  // 思考动画：模型思考时显示旋转动画
+  const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+  let spinnerIndex = 0
+  let thinkingTimer: ReturnType<typeof setInterval> | null = null
+  let lastRenderedStatus = ''
+  const startThinkingAnimation = () => {
+    if (thinkingTimer) return
+    thinkingTimer = setInterval(() => {
+      if (!state.activeTool) {
+        const newStatus = `${spinnerFrames[spinnerIndex]} Thinking...`
+        spinnerIndex = (spinnerIndex + 1) % spinnerFrames.length
+        // 只在状态文字真正变化时才 rerender
+        if (newStatus !== lastRenderedStatus) {
+          state.status = newStatus
+          lastRenderedStatus = newStatus
+          rerender()
+        }
+      }
+    }, 150)
+  }
+  const stopThinkingAnimation = () => {
+    if (thinkingTimer) {
+      clearInterval(thinkingTimer)
+      thinkingTimer = null
+    }
+  }
+  startThinkingAnimation()
+
   const pendingToolEntries = new Map<string, number[]>()
   const aggregatedEditByKey = new Map<string, AggregatedEditProgress>()
   const aggregatedEditByEntryId = new Map<number, AggregatedEditProgress>()
   const toolStartTimes = new Map<number, number>()
+  let boardPollTimer: ReturnType<typeof setInterval> | null = null
 
   args.permissions.beginTurn()
   try {
@@ -1348,8 +1524,34 @@ async function handleInput(
         rerender()
       },
       onToolStart(toolName, toolInput) {
+        stopThinkingAnimation()
         state.status = `Running ${toolName}...`
         state.activeTool = toolName
+
+        // orchestrate_tasks 执行期间，轮询 agent board 并刷新 TUI
+        if (toolName === 'orchestrate_tasks' && state.agentBoardManager) {
+          pushTranscriptEntry(state, {
+            kind: 'orchestrator',
+            body: '🔧 正在编排任务，拆分子任务中...',
+          })
+          pushTranscriptEntry(state, {
+            kind: 'agent_board',
+            agents: state.agentBoardManager.getAgents(),
+          })
+          let lastBoardSnapshot = JSON.stringify(state.agentBoardManager.getAgents())
+          boardPollTimer = setInterval(() => {
+            const currentSnapshot = JSON.stringify(state.agentBoardManager!.getAgents())
+            if (currentSnapshot !== lastBoardSnapshot) {
+              lastBoardSnapshot = currentSnapshot
+              const boardEntry = state.transcript.find(e => e.kind === 'agent_board')
+              if (boardEntry && boardEntry.kind === 'agent_board') {
+                boardEntry.agents = state.agentBoardManager!.getAgents()
+              }
+              rerender()
+            }
+          }, 1000)
+        }
+
         let entryId: number
         const targetPath = extractPathFromToolInput(toolInput)
         const canAggregate = isFileEditTool(toolName) && targetPath !== null
@@ -1399,6 +1601,22 @@ async function handleInput(
         rerender()
       },
       onToolResult(toolName, output, isError) {
+        // 清理 agent board 轮询定时器
+        if (toolName === 'orchestrate_tasks' && boardPollTimer) {
+          clearInterval(boardPollTimer)
+          boardPollTimer = null
+          // 最终刷新一次 board 状态
+          const boardEntry = state.transcript.find(e => e.kind === 'agent_board')
+          if (boardEntry && boardEntry.kind === 'agent_board' && state.agentBoardManager) {
+            boardEntry.agents = state.agentBoardManager.getAgents()
+          }
+          // 更新已有的 orchestrator 条目（不新增）
+          const orchEntry = [...state.transcript].reverse().find(e => e.kind === 'orchestrator')
+          if (orchEntry && orchEntry.kind === 'orchestrator') {
+            orchEntry.body = isError ? `❌ 编排失败: ${output}` : `✅ ${output}`
+          }
+        }
+
         const pending = pendingToolEntries.get(toolName) ?? []
         const entryId = pending.shift()
         pendingToolEntries.set(toolName, pending)
@@ -1473,6 +1691,7 @@ async function handleInput(
         }
         state.activeTool = null
         state.status = 'Thinking...'
+        startThinkingAnimation()
         rerender()
       },
     })
@@ -1492,6 +1711,11 @@ async function handleInput(
     })
     state.transcriptScrollOffset = 0
   } finally {
+    stopThinkingAnimation()
+    if (boardPollTimer) {
+      clearInterval(boardPollTimer)
+      boardPollTimer = null
+    }
     args.permissions.endTurn()
     state.isBusy = false
   }
@@ -1553,6 +1777,7 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
     transcriptBodyStartY: 0,
     transcriptBodyLines: 20,
     pendingStartupMessages: [],
+    agentBoardManager: args.agentBoardManager ?? null,
   }
   state.historyIndex = state.history.length
 

@@ -1,22 +1,11 @@
 import process from 'node:process'
-import { charDisplayWidth, wrapPanelBodyLine } from './chrome.js'
+import { charDisplayWidth, wrapPanelBodyLine, displayWidth } from './chrome.js'
 import { renderMarkdownish } from './markdown.js'
 import type { TranscriptEntry } from './types.js'
-
-const RESET = '[0m'
-const DIM = '[2m'
-const CYAN = '[36m'
-const GREEN = '[32m'
-const YELLOW = '[33m'
-const RED = '[31m'
-const MAGENTA = '[35m'
-const BOLD = '[1m'
-const BLUE = '[34m'
-const REVERSE = '[7m'
-const BRIGHT_GREEN = '[92m'
-const DEEP_BLUE = '[38;5;24m'  // deep blue for user bar
-const USER_BG = '[48;5;254m'  // light gray bg for user messages
-const BLACK = '[30m'  // black text for user messages
+import {
+  RESET, DIM, CYAN, GREEN, YELLOW, RED, MAGENTA, BOLD, BLUE, REVERSE,
+  BRIGHT_GREEN, DEEP_BLUE, USER_BG, BLACK,
+} from './colors.js'
 
 export type TranscriptSelection = {
   startLine: number
@@ -26,7 +15,20 @@ export type TranscriptSelection = {
 }
 
 function stripAnsi(str: string): string {
-  return str.replace(/\[[\d;]*[A-Za-z]/g, '')
+  return str.replace(/\[[\d;]*[A-Za-z]/g, '')
+}
+
+/** 按显示宽度截断字符串，中文字符占 2 个宽度 */
+function truncateByWidth(str: string, maxWidth: number): string {
+  let width = 0
+  let result = ''
+  for (const char of str) {
+    const charWidth = charDisplayWidth(char)
+    if (width + charWidth > maxWidth) break
+    result += char
+    width += charWidth
+  }
+  return result + '...'
 }
 
 function sliceByDisplayColumns(input: string, startCol: number, endCol: number): string {
@@ -137,11 +139,50 @@ function previewToolBody(toolName: string, body: string): string {
   return limited
 }
 
-function displayWidth(str: string): number {
-  const plain = stripAnsi(str)
-  let w = 0
-  for (const ch of plain) w += charDisplayWidth(ch)
-  return w
+const BOX_INNER_WIDTH = 56  // 统一的盒子内部宽度
+
+function renderAgentBoard(agents: Array<{ id: string; label: string; task: string; status: string; current_tool?: string; result_summary?: string }>): string {
+  if (agents.length === 0) return ''
+
+  const bar = `${DIM}│${RESET} `
+  const innerWidth = BOX_INNER_WIDTH
+  const lines: string[] = []
+
+  // 顶边框
+  lines.push(`${bar}${DIM}┌─ agents ${'─'.repeat(innerWidth - 10)}┐${RESET}`)
+
+  // 每个 agent 行：先渲染内容，再测量宽度，最后填充
+  for (const agent of agents) {
+    const icon = agent.status === 'running' ? `${YELLOW}⚡${RESET}`
+      : agent.status === 'done' ? `${GREEN}✓${RESET}`
+      : agent.status === 'error' ? `${RED}✗${RESET}`
+      : agent.status === 'waiting' ? `${DIM}⏳${RESET}`
+      : `${DIM}○${RESET}`
+
+    const statusColor = agent.status === 'running' ? YELLOW
+      : agent.status === 'done' ? GREEN
+      : agent.status === 'error' ? RED
+      : DIM
+
+    // 截断（按显示宽度）
+    const labelRaw = displayWidth(agent.label) > 12 ? truncateByWidth(agent.label, 10) : agent.label
+    const taskRaw = displayWidth(agent.task) > 28 ? truncateByWidth(agent.task, 25) : agent.task
+    const statusText = agent.status
+
+    // 渲染内容（不含右边框）
+    const content = `${icon} ${BOLD}${labelRaw}${RESET} ${taskRaw} ${statusColor}${statusText}${RESET}`
+    // 测量实际显示宽度（去掉 ANSI 码）
+    const contentWidth = displayWidth(content)
+    // 填充到 innerWidth - 1（留 1 给右边框）
+    const padding = Math.max(1, innerWidth - 1 - contentWidth)
+
+    lines.push(`${bar}${DIM}│${RESET} ${content}${' '.repeat(padding)}${DIM}│${RESET}`)
+  }
+
+  // 底边框
+  lines.push(`${bar}${DIM}└${'─'.repeat(innerWidth)}┘${RESET}`)
+
+  return lines.join('\n')
 }
 
 function renderTranscriptEntry(entry: TranscriptEntry): string {
@@ -171,6 +212,19 @@ function renderTranscriptEntry(entry: TranscriptEntry): string {
     )}`
   }
 
+  if (entry.kind === 'orchestrator') {
+    return `${MAGENTA}${BOLD}orchestrator${RESET} ${DIM}│${RESET} ${indentBlock(renderMarkdownish(entry.body))}`
+  }
+
+  if (entry.kind === 'agent_message') {
+    return `${CYAN}${BOLD}${entry.agentId}${RESET} ${DIM}│${RESET} ${indentBlock(renderMarkdownish(entry.body))}`
+  }
+
+  if (entry.kind === 'agent_board') {
+    return renderAgentBoard(entry.agents)
+  }
+
+  // Tool entry
   const status =
     entry.status === 'running'
       ? `${YELLOW}running${RESET}`
@@ -201,24 +255,20 @@ function renderTranscriptEntry(entry: TranscriptEntry): string {
     : ''
   const iconPlain = entry.status === 'success' ? '✓' : entry.status === 'error' ? '✗' : '⏳ running'
 
-  // 固定宽度，避免运行中和完成后宽度变化导致闪烁
   const contentLines = body.split('\n')
-  const boxInnerWidth = 50
+  const boxInnerWidth = BOX_INNER_WIDTH
 
-  // 顶行: ┌─ name ── icon duration ─┐
-  // 总宽度 = boxInnerWidth + 2 (左右边框)
-  // header 内容: ┌─ name ── icon duration ─┐
+  // 顶行
   const headerRight = `${icon}${durationStr}`
   const headerRightPlain = `${iconPlain}${durationPlain}`
-  const usedWidth = entry.toolName.length + headerRightPlain.length + 6  // ┌─ name ── ... ─┐
+  const usedWidth = entry.toolName.length + headerRightPlain.length + 6
   const headerDash = Math.max(1, boxInnerWidth - usedWidth)
   const header = `${DIM}┌─ ${BOLD}${entry.toolName}${RESET}${DIM} ${'─'.repeat(headerDash)} ${headerRight} ${DIM}─┐${RESET}`
 
-  // 内容行: │  content  │  每行总宽度 = boxInnerWidth + 2
+  // 内容行
   const rows = contentLines.map(line => {
     let w = displayWidth(line)
     let displayLine = line
-    // 截断超长内容
     if (w > boxInnerWidth - 3) {
       displayLine = line.slice(0, boxInnerWidth - 6) + '...'
       w = boxInnerWidth - 3
@@ -227,7 +277,7 @@ function renderTranscriptEntry(entry: TranscriptEntry): string {
     return `${DIM}│${RESET} ${displayLine}${' '.repeat(pad)}${DIM}│${RESET}`
   })
 
-  // 底行: └──────────┘  总宽度 = boxInnerWidth + 2
+  // 底行
   const footer = `${DIM}└${'─'.repeat(boxInnerWidth)}┘${RESET}`
 
   const bar = `${BLUE}│${RESET} `
