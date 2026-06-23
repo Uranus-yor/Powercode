@@ -87,17 +87,20 @@ function previewBody(toolName: string, body: string): string {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 色条前缀
+// 色条前缀 & 左边距
 // ═══════════════════════════════════════════════════════════════
+
+/** 左边距 */
+const PAD = '  '
 
 /** 色条标记: ▌ content */
 function barPrefix(color: string): string {
-  return `${color}${BOLD}\u258c${RESET} `
+  return `${PAD}${color}${BOLD}\u258c${RESET} `
 }
 
 /** 缩进前缀 */
 function indent(level: number = 1): string {
-  return '  '.repeat(level)
+  return PAD + '  '.repeat(level)
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -177,17 +180,18 @@ function renderUserMessage(entry: Extract<TranscriptEntry, { kind: 'user' }>): s
 // ═══════════════════════════════════════════════════════════════
 
 function renderTranscriptEntry(entry: TranscriptEntry, _width?: number): string {
+  const p = PAD // 左边距
   switch (entry.kind) {
     case 'user':
       return renderUserMessage(entry)
     case 'assistant':
-      return renderMarkdownish(entry.body)
+      return renderMarkdownish(entry.body).split('\n').map(l => `${p}${l}`).join('\n')
     case 'progress':
-      return `${DIM}\u25b6 progress${RESET}\n${renderMarkdownish(entry.body)}`
+      return `${p}${DIM}\u25b6 progress${RESET}\n${renderMarkdownish(entry.body).split('\n').map(l => `${p}${l}`).join('\n')}`
     case 'orchestrator':
-      return `${barPrefix(BAR_ORCH)}${ACCENT2}${BOLD}orchestrator${RESET}\n${renderMarkdownish(entry.body)}`
+      return `${barPrefix(BAR_ORCH)}${ACCENT2}${BOLD}orchestrator${RESET}\n${renderMarkdownish(entry.body).split('\n').map(l => `${p}${l}`).join('\n')}`
     case 'agent_message':
-      return `${barPrefix(BAR_AGENT)}${CYAN}${BOLD}${entry.agentId}${RESET}\n${renderMarkdownish(entry.body)}`
+      return `${barPrefix(BAR_AGENT)}${CYAN}${BOLD}${entry.agentId}${RESET}\n${renderMarkdownish(entry.body).split('\n').map(l => `${p}${l}`).join('\n')}`
     case 'agent_board':
       return renderAgentBoard(entry.agents)
     case 'tool':

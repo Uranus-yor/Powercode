@@ -32,12 +32,13 @@ describe('transcript CJK selection', () => {
     const entries: TranscriptEntry[] = [
       { id: 1, kind: 'assistant', body: '你A' },
     ]
-    // '你' is at columns 0-2, 'A' is at column 2
+    // With PAD ('  ') prefix: '  你A'
+    // '你' is at columns 2-4, 'A' is at column 4
     const selection: TranscriptSelection = {
       startLine: 0,
-      startCol: 0,
+      startCol: 2,
       endLine: 0,
-      endCol: 2,
+      endCol: 4,
     }
 
     const rendered = withTerminalWidth(60, () => renderTranscript(entries, 0, 10, selection))
@@ -53,9 +54,9 @@ describe('transcript CJK selection', () => {
     ]
     const selection: TranscriptSelection = {
       startLine: 0,
-      startCol: 0,
+      startCol: 2,
       endLine: 0,
-      endCol: 2,
+      endCol: 4,
     }
 
     const selected = withTerminalWidth(60, () => extractSelectedText(entries, selection))

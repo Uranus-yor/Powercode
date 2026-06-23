@@ -45,16 +45,16 @@ describe('transcript wrapping', () => {
 
   it('extracts text from a wrapped continuation row', () => {
     const entries = makeWrappedAssistantEntry()
-    // No indent prefix in new design:
-    // Line 0: 60 a's
+    // With PAD ('  ') prefix on assistant entries:
+    // Line 0: '  ' + 58 a's = 60 chars
     // Line 1: 60 a's
-    // Line 2: 46 a's + 'BCDEFG' = 52 chars
-    // BCDEFG starts at col 46 on line 2
+    // Line 2: 48 a's + 'BCDEFG' = 54 chars
+    // BCDEFG starts at col 48 on line 2
     const selection: TranscriptSelection = {
       startLine: 2,
-      startCol: 46,
+      startCol: 48,
       endLine: 2,
-      endCol: 52,
+      endCol: 54,
     }
 
     const selected = withTerminalWidth(60, () => extractSelectedText(entries, selection))
