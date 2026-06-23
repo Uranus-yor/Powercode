@@ -61,6 +61,7 @@ import {
   moveCursorTo,
   enableCursorBlink,
   stringDisplayWidth,
+  charDisplayWidth,
   renderFrame,
   resetBuffer,
   type TranscriptEntry,
@@ -711,7 +712,6 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
     state.input,
     state.cursorOffset,
   )
-  const inputPanelLines = inputPanel.split('\n').length
 
   // 运行动画提示（固定位置，不影响输入框位置）
   let busyLine = ''
@@ -734,6 +734,9 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
     menuLines = menuContent.split('\n').length
   }
 
+  // 输入面板行数（动态）
+  const inputPanelLines = inputPanel.split('\n').length
+
   // 固定区域高度：busy动画(1) + 输入面板 + 底部padding(2) + 斜杠菜单
   const bottomFixedLines = 1 + inputPanelLines + 2 + menuLines
 
@@ -753,11 +756,37 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
   for (let i = 0; i < 2; i++) parts.push('')  // 底部 padding
   if (menuContent) parts.push(menuContent)
 
-  // 计算光标位置（输入框固定在底部）
-  const inputRow = rows - 2 - menuLines - 1  // 底部padding(2) + 斜杠菜单 + 输入面板偏移
+  // 计算光标位置（输入框支持多行）
   const inputText = state.input ?? ''
-  const beforeCursor = inputText.slice(0, Math.min(state.cursorOffset, inputText.length))
-  const cursorCol = leftPad + 4 + stringDisplayWidth(beforeCursor)
+  const offset = Math.max(0, Math.min(state.cursorOffset ?? 0, inputText.length))
+  const maxInputW = Math.max(1, terminalWidth - 6)
+
+  // 计算光标在哪一行
+  let cursorLineInPanel = 0
+  let cursorColInLine = 0
+  let currentWidth = 0
+  let charIdx = 0
+  for (const ch of [...inputText]) {
+    const cw = charDisplayWidth(ch)
+    if (currentWidth + cw > maxInputW && charIdx > 0) {
+      cursorLineInPanel++
+      currentWidth = 0
+    }
+    if (charIdx === offset) {
+      cursorColInLine = currentWidth
+      break
+    }
+    currentWidth += cw
+    charIdx++
+  }
+  if (charIdx === offset) {
+    cursorColInLine = currentWidth
+  }
+
+  // 输入面板从底部往上数的位置
+  const inputPanelStartRow = rows - 2 - menuLines - inputPanelLines
+  const inputRow = inputPanelStartRow + cursorLineInPanel + 1  // +1 因为第一行是分隔线
+  const cursorCol = leftPad + 6 + cursorColInLine  // "> " 前缀 + padding
   flushFrame(parts, { row: inputRow, col: cursorCol })
 }
 

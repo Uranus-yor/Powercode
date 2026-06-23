@@ -1,6 +1,6 @@
 import { charDisplayWidth, stringDisplayWidth, renderDivider } from './chrome.js'
 import {
-  RESET, DIM, BOLD,
+  RESET, DIM, BOLD, REVERSE,
   SUCCESS, ACCENT,
   FG_DIM,
   applyGradient, stripAnsi,
@@ -52,40 +52,64 @@ export function renderInputPanel(
   // 分隔线
   result.push(`${pad}${renderDivider(width)}`)
 
-  // 输入行: > user input
-  const offset = Math.max(0, Math.min(cursorOffset ?? 0, (input ?? '').length))
+  // 输入内容：支持多行显示
   const text = input ?? ''
-  let before = text.slice(0, offset)
-  const cursor = text[offset] ?? ' '
-  let after = text.slice(Math.min(offset + 1, text.length))
+  const offset = Math.max(0, Math.min(cursorOffset ?? 0, text.length))
+  const maxInputW = Math.max(0, width - 6)  // "> " 前缀 + 两侧 padding
 
-  // 截断
-  const maxInputW = Math.max(0, width - 4)
-  const beforeW = stringDisplayWidth(before)
-  const afterW = stringDisplayWidth(after)
-  if (beforeW + afterW > maxInputW) {
-    if (beforeW > maxInputW - 1) {
-      let w = 0, si = 0
-      for (let i = 0; i < before.length; i++) {
-        const cw = charDisplayWidth(before[i] ?? '')
-        if (w + cw > beforeW - (maxInputW - 1)) { si = i; break }
-        w += cw
-      }
-      before = '\u2026' + before.slice(si + 1)
+  // 将输入文本按宽度换行
+  const lines: string[] = []
+  let currentLine = ''
+  let currentWidth = 0
+  let cursorLine = 0
+  let cursorColInLine = 0
+  let charIndex = 0
+
+  for (const ch of [...text]) {
+    const cw = charDisplayWidth(ch)
+    if (currentWidth + cw > maxInputW && currentLine.length > 0) {
+      lines.push(currentLine)
+      currentLine = ''
+      currentWidth = 0
     }
-    const rem = maxInputW - stringDisplayWidth(before)
-    if (afterW > rem) {
-      let w = 0, ei = after.length
-      for (let i = 0; i < after.length; i++) {
-        const cw = charDisplayWidth(after[i] ?? '')
-        if (w + cw > rem - 1) { ei = i; break }
-        w += cw
-      }
-      after = after.slice(0, ei) + '\u2026'
+    if (charIndex === offset) {
+      cursorLine = lines.length
+      cursorColInLine = currentWidth
     }
+    currentLine += ch
+    currentWidth += cw
+    charIndex++
+  }
+  lines.push(currentLine)
+
+  // 如果光标在最后
+  if (charIndex === offset) {
+    cursorLine = lines.length - 1
+    cursorColInLine = currentWidth
   }
 
-  result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${before}${cursor}${after}`)
+  // 如果没有输入，显示一行空的带光标
+  if (lines.length === 0) {
+    lines.push('')
+  }
+
+  // 渲染每一行
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? ''
+    if (i === cursorLine) {
+      // 光标所在行：插入光标
+      const before = line.slice(0, Math.min(offset, line.length))
+      const cursorCh = line[offset] ?? ' '
+      const after = line.slice(Math.min(offset + 1, line.length))
+      result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${before}${REVERSE}${cursorCh}${RESET}${after}`)
+    } else if (i === 0) {
+      // 第一行
+      result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${line}`)
+    } else {
+      // 后续行（续行）
+      result.push(`${pad}    ${line}`)
+    }
+  }
 
   // 状态行: model · ctx · 快捷键
   const model = modelName ? `${DIM}model${RESET} ${SUCCESS}${modelName}${RESET}` : ''
