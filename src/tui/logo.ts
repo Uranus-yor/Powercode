@@ -105,13 +105,13 @@ export function renderInputPanel(
       const after = line.slice(Math.min(offset + 1, line.length))
       // 根据 cursorVisible 决定是否显示反色光标
       if (showCursor) {
-        result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${before}${REVERSE}${cursorCh}${RESET}${after}`)
+        result.push(`${pad}  ${REVERSE}>${RESET} ${before}${REVERSE}${cursorCh}${RESET}${after}`)
       } else {
-        result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${before}${cursorCh}${after}`)
+        result.push(`${pad}  ${DIM}>${RESET} ${before}${cursorCh}${after}`)
       }
     } else if (i === 0) {
       // 第一行
-      result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${line}`)
+      result.push(`${pad}  ${DIM}>${RESET} ${line}`)
     } else {
       // 后续行（续行）
       result.push(`${pad}    ${line}`)
