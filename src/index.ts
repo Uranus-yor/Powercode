@@ -15,6 +15,8 @@ import { MockModelAdapter } from "./mock-model.js";
 import { PermissionManager } from "./permissions.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { createDefaultToolRegistry, hydrateMcpTools } from "./tools/index.js";
+import { createOrchestrateTasksTool } from "./tools/orchestrate-tasks.js";
+import { AgentBoardManager } from "./multi-agent/agent-board.js";
 import type { ChatMessage } from "./core/types.js";
 import { renderBanner } from "./ui.js";
 import { runTtyApp } from "./tty-app.js";
@@ -89,6 +91,19 @@ async function main(): Promise<void> {
     process.env.POWER_CODE_MODEL_MODE === "mock"
       ? new MockModelAdapter()
       : new AnthropicModelAdapter(tools, loadRuntimeConfig);
+
+  // Register orchestrate_tasks tool (needs model, so added after model creation)
+  const agentBoardManager = new AgentBoardManager()
+  tools.addTools([
+    createOrchestrateTasksTool({
+      model,
+      tools,
+      getRuntimeConfig: loadRuntimeConfig,
+      modelName: runtime?.model,
+      boardManager: agentBoardManager,
+    }),
+  ]);
+
   let messages: ChatMessage[] = [
     {
       role: "system",
@@ -130,6 +145,7 @@ async function main(): Promise<void> {
         runtime,
         tools,
         model,
+        agentBoardManager,
         messages,
         cwd,
         permissions,

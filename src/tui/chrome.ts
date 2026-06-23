@@ -56,6 +56,11 @@ export function stringDisplayWidth(input: string): number {
   return [...stripAnsi(input)].reduce((sum, char) => sum + charDisplayWidth(char), 0)
 }
 
+/** 计算字符串的显示宽度（别名，与 stringDisplayWidth 相同） */
+export function displayWidth(str: string): number {
+  return stringDisplayWidth(str)
+}
+
 function truncatePlain(input: string, width: number): string {
   if (width <= 0) return ''
   if (stringDisplayWidth(input) <= width) return input

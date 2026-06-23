@@ -24,6 +24,7 @@ export {
   enableCursorBlink,
   stringDisplayWidth,
   forceFullRepaint,
+  renderFrame,
 } from './tui/index.js'
 
 export type { TranscriptEntry } from './tui/index.js'
