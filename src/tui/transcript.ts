@@ -1,14 +1,14 @@
 import process from 'node:process'
-import { charDisplayWidth, wrapPanelBodyLine, displayWidth, renderCard } from './chrome.js'
+import { charDisplayWidth, wrapPanelBodyLine, displayWidth, renderDivider } from './chrome.js'
 import { renderMarkdownish } from './markdown.js'
 import type { TranscriptEntry } from './types.js'
 import {
   RESET, DIM, BOLD, REVERSE,
-  FG, FG_DIM, FG_BRIGHT,
+  FG, FG_DIM,
   SUCCESS, ERROR, WARNING,
   ACCENT, ACCENT2,
-  CYAN, USER_BG, BLACK,
-  BORDER_DIM,
+  CYAN,
+  BAR_USER, BAR_TOOL, BAR_ERROR, BAR_AGENT, BAR_ORCH,
   stripAnsi,
 } from './colors.js'
 
@@ -71,10 +71,6 @@ function highlightRange(line: string, startCol: number, endCol: number): string 
   return result
 }
 
-function indentBlock(input: string, prefix = '  '): string {
-  return input.split('\n').map(l => `${prefix}${l}`).join('\n')
-}
-
 // ═══════════════════════════════════════════════════════════════
 // 工具输出预览
 // ═══════════════════════════════════════════════════════════════
@@ -91,24 +87,28 @@ function previewBody(toolName: string, body: string): string {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 卡片宽度 - 统一控制
+// 色条前缀
 // ═══════════════════════════════════════════════════════════════
 
-function getCardWidth(): number {
-  const terminal = process.stdout.columns ?? 80
-  // 卡片最大60字符宽，居中显示
-  return Math.min(60, terminal)
+/** 色条标记: ▌ content */
+function barPrefix(color: string): string {
+  return `${color}${BOLD}\u258c${RESET} `
+}
+
+/** 缩进前缀 */
+function indent(level: number = 1): string {
+  return '  '.repeat(level)
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 多Agent面板
+// 多Agent面板 - 色条 + 图标
 // ═══════════════════════════════════════════════════════════════
 
-function renderAgentBoard(agents: Array<{ id: string; label: string; task: string; status: string; current_tool?: string; result_summary?: string }>): string {
+function renderAgentBoard(agents: Array<{ id: string; label: string; task: string; status: string }>): string {
   if (agents.length === 0) return ''
 
-  const w = getCardWidth()
   const lines: string[] = []
+  lines.push(`${barPrefix(BAR_AGENT)}${ACCENT2}${BOLD}agents${RESET}`)
 
   for (const agent of agents) {
     const icon = agent.status === 'running' ? `${WARNING}\u26a1${RESET}`
@@ -121,66 +121,73 @@ function renderAgentBoard(agents: Array<{ id: string; label: string; task: strin
       : agent.status === 'done' ? SUCCESS
       : agent.status === 'error' ? ERROR : FG_DIM
 
-    const label = truncate(agent.label, 12)
-    const task = truncate(agent.task, 28)
-    lines.push(`${icon} ${BOLD}${label}${RESET} ${task} ${statusColor}${agent.status}${RESET}`)
+    const label = truncate(agent.label, 14)
+    const task = truncate(agent.task, 30)
+
+    lines.push(`${indent()}${icon} ${BOLD}${label}${RESET} ${task} ${statusColor}${agent.status}${RESET}`)
   }
 
-  return renderCard('agents', lines, w)
+  return lines.join('\n')
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 工具调用卡片
+// 工具调用 - 色条 + 状态
 // ═══════════════════════════════════════════════════════════════
 
 function renderToolCard(entry: Extract<TranscriptEntry, { kind: 'tool' }>): string {
+  const barColor = entry.status === 'success' ? BAR_TOOL
+    : entry.status === 'error' ? BAR_ERROR
+    : BAR_ORCH
+
   const statusIcon = entry.status === 'success' ? `${SUCCESS}\u2713${RESET}`
     : entry.status === 'error' ? `${ERROR}\u2717${RESET}`
     : `${WARNING}\u23f3${RESET}`
 
-  const durationStr = entry.duration !== undefined ? ` ${DIM}${entry.duration}ms${RESET}` : ''
+  const duration = entry.duration !== undefined ? ` ${DIM}${entry.duration}ms${RESET}` : ''
 
   const body = entry.status === 'running' ? entry.body
     : entry.collapsed ? `${DIM}${entry.collapsedSummary ?? 'output collapsed'}${RESET}`
     : entry.collapsePhase ? `${DIM}collapsing${'.'.repeat(entry.collapsePhase)}${RESET}`
     : previewBody(entry.toolName, renderMarkdownish(entry.body))
 
-  const contentLines = body.split('\n')
-  const w = getCardWidth()
+  const lines: string[] = []
+  // 标题行: ▌ ✓ tool_name 12ms
+  lines.push(`${barPrefix(barColor)}${statusIcon} ${BOLD}${entry.toolName}${RESET}${duration}`)
 
-  return renderCard(entry.toolName, contentLines, w, `${statusIcon}${durationStr}`)
+  // 内容行（缩进）
+  const contentLines = body.split('\n')
+  for (const line of contentLines) {
+    lines.push(`${indent()}${DIM}\u2502${RESET} ${line}`)
+  }
+
+  return lines.join('\n')
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 用户消息 - 左侧色条设计
+// 用户消息 - 蓝色色条
 // ═══════════════════════════════════════════════════════════════
 
-function renderUserMessage(entry: Extract<TranscriptEntry, { kind: 'user' }>, width?: number): string {
-  const panelWidth = (width ?? process.stdout.columns ?? 80) - 2
+function renderUserMessage(entry: Extract<TranscriptEntry, { kind: 'user' }>): string {
   const bodyLines = entry.body.replace(/\t/g, '    ').split('\n')
-
-  // 左侧色条: ▌ + 内容
-  return bodyLines.map(line => {
-    return `${ACCENT}${BOLD}\u258c${RESET} ${line}`
-  }).join('\n')
+  return bodyLines.map(line => `${barPrefix(BAR_USER)}${line}`).join('\n')
 }
 
 // ═══════════════════════════════════════════════════════════════
 // 会话条目渲染
 // ═══════════════════════════════════════════════════════════════
 
-function renderTranscriptEntry(entry: TranscriptEntry, width?: number): string {
+function renderTranscriptEntry(entry: TranscriptEntry, _width?: number): string {
   switch (entry.kind) {
     case 'user':
-      return renderUserMessage(entry, width)
+      return renderUserMessage(entry)
     case 'assistant':
-      return indentBlock(renderMarkdownish(entry.body))
+      return renderMarkdownish(entry.body)
     case 'progress':
-      return `${DIM}\u25b6 progress${RESET}\n${indentBlock(renderMarkdownish(entry.body))}`
+      return `${DIM}\u25b6 progress${RESET}\n${renderMarkdownish(entry.body)}`
     case 'orchestrator':
-      return `${ACCENT2}${BOLD}\u2699 orchestrator${RESET}\n${indentBlock(renderMarkdownish(entry.body))}`
+      return `${barPrefix(BAR_ORCH)}${ACCENT2}${BOLD}orchestrator${RESET}\n${renderMarkdownish(entry.body)}`
     case 'agent_message':
-      return `${CYAN}${BOLD}${entry.agentId}${RESET}\n${indentBlock(renderMarkdownish(entry.body))}`
+      return `${barPrefix(BAR_AGENT)}${CYAN}${BOLD}${entry.agentId}${RESET}\n${renderMarkdownish(entry.body)}`
     case 'agent_board':
       return renderAgentBoard(entry.agents)
     case 'tool':

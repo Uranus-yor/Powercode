@@ -6,12 +6,12 @@ import type { SlashCommand } from '../cli-commands.js'
 import type { PermissionRequest } from '../permissions.js'
 import {
   RESET, DIM, BOLD, REVERSE,
-  BORDER_DIM, BORDER_ACCENT,
   FG, FG_DIM, FG_BRIGHT,
   SUCCESS, ERROR, WARNING, INFO,
   ACCENT, ACCENT2,
   BRIGHT_CYAN, BRIGHT_GREEN, BRIGHT_RED, BRIGHT_YELLOW,
   CYAN, GREEN, YELLOW, BLUE, MAGENTA,
+  BORDER_DIM,
   stripAnsi, applyGradient,
 } from './colors.js'
 
@@ -108,101 +108,41 @@ function joinWithinWidth(segments: string[], sep: string, max: number): string {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 卡片组件 - 核心设计单元
+// 分隔线
 // ═══════════════════════════════════════════════════════════════
 
-const B = {
-  tl: '╭', tr: '╮', bl: '╰', br: '╯',
-  h: '─', v: '│',
-} as const
+/** 渲染水平分隔线 */
+export function renderDivider(width: number, label?: string): string {
+  const ch = '\u2500' // ─
+  if (!label) return `${DIM}${ch.repeat(width)}${RESET}`
+  const labelW = stringDisplayWidth(label) + 2
+  const dashN = Math.max(1, width - labelW)
+  return `${DIM}${ch.repeat(Math.floor(dashN / 2))} ${FG_DIM}${label}${RESET} ${DIM}${ch.repeat(Math.ceil(dashN / 2))}${RESET}`
+}
 
-/**
- * 渲染一个完整闭合的卡片
- * @param title 卡片标题
- * @param lines 内容行（原始字符串，会自动处理宽度）
- * @param width 卡片总宽度
- * @param rightTitle 右侧标题（可选）
- */
-export function renderCard(
+// ═══════════════════════════════════════════════════════════════
+// renderPanel - 保留兼容（用于 session picker 等特殊场景）
+// ═══════════════════════════════════════════════════════════════
+
+export function renderPanel(
   title: string,
-  lines: string[],
-  width: number,
-  rightTitle?: string,
+  body: string,
+  options: { rightTitle?: string; minBodyLines?: number; width?: number } = {},
 ): string {
-  const inner = width - 2
+  const width = options.width ?? Math.max(60, process.stdout.columns ?? 100)
+  const bodyLines = body.length > 0 ? body.split('\n') : []
+  const renderedLines = bodyLines.flatMap(l => wrapPanelBodyLine(l, width))
+  const minBodyLines = options.minBodyLines ?? 0
+  while (renderedLines.length < minBodyLines) renderedLines.push('')
+
   const result: string[] = []
-
-  // 顶部: ╭─ title ───────── rightTitle ─╮
-  const titlePart = ` ${BOLD}${ACCENT}${title}${RESET}${BORDER_DIM} `
-  const titleW = stringDisplayWidth(title) + 2
-  let rightPart = '', rightW = 0
-  if (rightTitle) {
-    const rt = truncatePlain(rightTitle, Math.floor(width * 0.3))
-    rightPart = ` ${DIM}${rt}${RESET}${BORDER_DIM} `
-    rightW = stringDisplayWidth(rt) + 2
-  }
-  const dashN = Math.max(1, inner - 1 - titleW - rightW)
-  result.push(`${BORDER_DIM}${B.tl}${B.h}${RESET}${titlePart}${BORDER_DIM}${B.h.repeat(dashN)}${RESET}${rightPart}${BORDER_DIM}${B.tr}${RESET}`)
-
-  // 内容行: │ content │
-  for (const line of lines) {
-    const plain = stripAnsi(line)
-    const w = stringDisplayWidth(line)
-    const maxW = inner - 2
-    let displayLine = line
-    if (w > maxW) {
-      // 截断
-      let cur = '', curW = 0
-      for (const ch of [...plain]) {
-        const cw = charDisplayWidth(ch)
-        if (curW + cw > maxW - 3) break
-        cur += ch
-        curW += cw
-      }
-      displayLine = `${cur}...`
-    }
-    const pad = Math.max(0, inner - 2 - stringDisplayWidth(displayLine))
-    result.push(`${BORDER_DIM}${B.v}${RESET} ${displayLine}${' '.repeat(pad)} ${BORDER_DIM}${B.v}${RESET}`)
-  }
-
-  // 底部: ╰─────────────────────────────╯
-  result.push(`${BORDER_DIM}${B.bl}${B.h.repeat(inner)}${B.br}${RESET}`)
-
+  result.push(renderDivider(width, title))
+  result.push(...renderedLines)
   return result.join('\n')
 }
 
-/**
- * 渲染行分割线
- */
-export function renderDivider(width: number, label?: string): string {
-  if (!label) {
-    return `${BORDER_DIM}${B.h.repeat(width)}${RESET}`
-  }
-  const labelW = stringDisplayWidth(label) + 2
-  const dashN = Math.max(1, width - labelW)
-  return `${BORDER_DIM}${B.h.repeat(Math.floor(dashN / 2))} ${DIM}${label}${RESET} ${BORDER_DIM}${B.h.repeat(Math.ceil(dashN / 2))}${RESET}`
-}
-
-/**
- * 渲染空行（带边框）
- */
-function emptyRow(width: number): string {
-  const inner = width - 2
-  return `${BORDER_DIM}${B.v}${RESET}${' '.repeat(inner)}${BORDER_DIM}${B.v}${RESET}`
-}
-
-/**
- * 渲染内容行（带边框）
- */
-function contentRow(content: string, width: number): string {
-  const inner = width - 2
-  const w = stringDisplayWidth(content)
-  const pad = Math.max(0, inner - 1 - w)
-  return `${BORDER_DIM}${B.v}${RESET} ${content}${' '.repeat(pad)}${BORDER_DIM}${B.v}${RESET}`
-}
-
 // ═══════════════════════════════════════════════════════════════
-// 会话内容行包裹（用于 transcript 内部的长行换行）
+// 会话内容行包裹
 // ═══════════════════════════════════════════════════════════════
 
 export function wrapPanelBodyLine(line: string, width: number): string[] {
@@ -237,43 +177,6 @@ export function wrapPanelBodyLine(line: string, width: number): string[] {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// renderPanel - 保留兼容（用于 session picker 等）
-// ═══════════════════════════════════════════════════════════════
-
-export function renderPanel(
-  title: string,
-  body: string,
-  options: { rightTitle?: string; minBodyLines?: number; width?: number } = {},
-): string {
-  const width = options.width ?? Math.max(60, process.stdout.columns ?? 100)
-  const bodyLines = body.length > 0 ? body.split('\n') : []
-  const renderedLines = bodyLines.flatMap(l => wrapPanelBodyLine(l, width - 4))
-  const minBodyLines = options.minBodyLines ?? 0
-  while (renderedLines.length < minBodyLines) renderedLines.push('')
-
-  const inner = width - 2
-  const result: string[] = []
-
-  // 顶部
-  const titlePart = ` ${BOLD}${ACCENT}${title}${RESET}${BORDER_DIM} `
-  const titleW = stringDisplayWidth(title) + 2
-  let rightPart = '', rightW = 0
-  if (options.rightTitle) {
-    const rt = truncatePlain(options.rightTitle, Math.floor(width * 0.3))
-    rightPart = ` ${DIM}${rt}${RESET}${BORDER_DIM} `
-    rightW = stringDisplayWidth(rt) + 2
-  }
-  const dashN = Math.max(1, inner - 1 - titleW - rightW)
-  result.push(`${BORDER_DIM}${B.tl}${B.h}${RESET}${titlePart}${BORDER_DIM}${B.h.repeat(dashN)}${RESET}${rightPart}${BORDER_DIM}${B.tr}${RESET}`)
-
-  result.push(emptyRow(width))
-  for (const line of renderedLines) result.push(contentRow(line, width))
-  result.push(`${BORDER_DIM}${B.bl}${B.h.repeat(inner)}${B.br}${RESET}`)
-
-  return result.join('\n')
-}
-
-// ═══════════════════════════════════════════════════════════════
 // 上下文使用率徽章
 // ═══════════════════════════════════════════════════════════════
 
@@ -288,20 +191,20 @@ export function renderContextBadge(stats: {
   const color = colorMap[warningLevel]
   const filled = Math.round(utilization * 10)
   const bar = '\u2593'.repeat(filled) + '\u2591'.repeat(10 - filled)
-  const src = accounting?.source === 'provider_usage' ? ' usage'
-    : accounting?.source === 'provider_usage_plus_estimate' ? ' usage+est'
-    : accounting?.source === 'estimate_only' ? ' est' : ''
-  return `${color}ctx${RESET} ${color}${pct}%${RESET} ${DIM}${bar}${src}${RESET}`
+  const src = accounting?.source === 'provider_usage' ? ''
+    : accounting?.source === 'provider_usage_plus_estimate' ? '+est'
+    : accounting?.source === 'estimate_only' ? 'est' : ''
+  return `${color}${pct}%${RESET} ${DIM}${bar}${src ? ` ${src}` : ''}${RESET}`
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 顶部横幅 - 系统信息
+// 顶部横幅 - 系统信息（无边框设计）
 // ═══════════════════════════════════════════════════════════════
 
 export function renderBanner(
   runtime: RuntimeConfig | null,
   cwd: string,
-  permissionSummary: string[],
+  _permissionSummary: string[],
   session: {
     transcriptCount: number; messageCount: number; skillCount: number
     mcpTotalCount: number; mcpConnectedCount: number
@@ -310,50 +213,29 @@ export function renderBanner(
   },
 ): string {
   const width = Math.max(60, process.stdout.columns ?? 100)
-  const inner = width - 2
   const cwdName = path.basename(cwd) || cwd
   const model = runtime?.model ?? 'not-configured'
   const provider = runtime?.baseUrl
     ? runtime.baseUrl.replace(/^https?:\/\//, '').split('/')[0] || 'custom'
     : 'offline'
 
-  // 行1: 项目路径
-  const pathBudget = Math.max(20, inner - 20)
-  const line1 = `${ACCENT}${BOLD}${truncatePlain(cwdName, 24)}${RESET} ${DIM}${truncatePathMiddle(cwd, pathBudget)}${RESET}`
+  // 行1: 品牌 + 项目
+  const brand = applyGradient('PowerCode')
+  const pathStr = `${ACCENT}${BOLD}${cwdName}${RESET} ${DIM}${truncatePathMiddle(cwd, Math.max(20, width - stringDisplayWidth(cwdName) - 20))}${RESET}`
+  const line1 = `${brand}  ${DIM}\u2502${RESET}  ${pathStr}`
 
-  // 行2: 元数据徽章
+  // 行2: 状态徽章
   const badges = [
     `${DIM}model${RESET} ${GREEN}${model}${RESET}`,
-    `${DIM}provider${RESET} ${CYAN}${provider}${RESET}`,
+    `${DIM}via${RESET} ${CYAN}${provider}${RESET}`,
     `${DIM}msgs${RESET} ${BRIGHT_CYAN}${session.messageCount}${RESET}`,
-    `${DIM}events${RESET} ${BLUE}${session.transcriptCount}${RESET}`,
-    ...(session.contextStats ? [renderContextBadge(session.contextStats)] : []),
-    `${DIM}skills${RESET} ${BRIGHT_GREEN}${session.skillCount}${RESET}`,
+    ...(session.contextStats ? [`${DIM}ctx${RESET} ${renderContextBadge(session.contextStats)}`] : []),
     `${DIM}mcp${RESET} ${MAGENTA}${session.mcpConnectedCount}/${session.mcpTotalCount}${RESET}`,
     ...(session.mcpErrorCount > 0 ? [`${DIM}err${RESET} ${BRIGHT_RED}${session.mcpErrorCount}${RESET}`] : []),
   ]
-  const line2 = joinWithinWidth(badges, ` ${DIM}\u2022${RESET} `, inner - 2)
+  const line2 = joinWithinWidth(badges, ` ${DIM}\u00b7${RESET} `, width)
 
-  // 行3: 权限
-  const permText = permissionSummary.length > 0
-    ? permissionSummary.join(' | ')
-    : 'permissions: ask on sensitive actions'
-  const line3 = `${DIM}${truncatePlain(permText, inner - 2)}${RESET}`
-
-  // 渲染
-  const inner2 = width - 2
-  const titlePart = ` ${BOLD}${applyGradient('PowerCode')}${RESET}${BORDER_DIM} `
-  const titleW = stringDisplayWidth('PowerCode') + 4
-  const dashN = Math.max(1, inner2 - titleW)
-
-  const result: string[] = []
-  result.push(`${BORDER_DIM}${B.tl}${B.h}${RESET}${titlePart}${BORDER_DIM}${B.h.repeat(dashN)}${B.tr}${RESET}`)
-  result.push(contentRow(line1, width))
-  result.push(contentRow(line2, width))
-  result.push(contentRow(line3, width))
-  result.push(`${BORDER_DIM}${B.bl}${B.h.repeat(inner2)}${B.br}${RESET}`)
-
-  return result.join('\n')
+  return `${line1}\n${line2}`
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -383,7 +265,7 @@ export function renderToolPanel(
     const s = tool.status === 'success' ? `${SUCCESS}\u2713${RESET}` : `${ERROR}\u2717${RESET}`
     items.push(`${s} ${tool.name}`)
   }
-  return items.join(` ${DIM}\u2022${RESET} `)
+  return items.join(` ${DIM}\u00b7${RESET} `)
 }
 
 export function renderFooterBar(
@@ -395,12 +277,10 @@ export function renderFooterBar(
   compressionStatus?: string | null,
 ): string {
   const width = Math.max(60, process.stdout.columns ?? 100)
-  const dot = `${DIM}\u2022${RESET}`
+  const dot = `${DIM}\u00b7${RESET}`
 
-  // 左侧: 状态
   const left = renderStatusLine(status)
 
-  // 右侧: 工具/技能/MCP
   const parts: string[] = []
   parts.push(`${DIM}tools${RESET} ${toolsEnabled ? `${SUCCESS}on${RESET}` : `${ERROR}off${RESET}`}`)
   parts.push(`${DIM}skills${RESET} ${skillsEnabled ? `${SUCCESS}on${RESET}` : `${ERROR}off${RESET}`}`)
@@ -413,8 +293,8 @@ export function renderFooterBar(
   if (compressionStatus) parts.push(`${WARNING}${compressionStatus}${RESET}`)
 
   const right = parts.join(` ${dot} `)
-  const gap = Math.max(2, width - stringDisplayWidth(left) - stringDisplayWidth(right) - 4)
-  return `${DIM}\u2502${RESET} ${left}  ${' '.repeat(gap)}  ${right} ${DIM}\u2502${RESET}`
+  const gap = Math.max(2, width - stringDisplayWidth(left) - stringDisplayWidth(right))
+  return `${DIM}\u2500${RESET} ${left}${' '.repeat(gap)}${right} ${DIM}\u2500${RESET}`
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -439,7 +319,7 @@ export function renderSlashMenu(commands: SlashCommand[], selectedIndex: number)
   for (const cat of categoryOrder) {
     const cmds = groups.get(cat)
     if (!cmds || cmds.length === 0) continue
-    lines.push(`${BORDER_DIM}\u2500\u2500 ${DIM}${cat}${RESET}`)
+    lines.push(`${DIM}\u2500\u2500 ${cat}${RESET}`)
     for (const cmd of cmds) {
       const usage = padPlain(cmd.usage, 24)
       const prefix = idx === safe ? `${REVERSE} ${usage} ${RESET}` : ` ${usage} `
@@ -525,7 +405,7 @@ export function renderPermissionPrompt(request: PermissionRequest, options: Perm
     ...(feedbackMode
       ? [`${WARNING}${BOLD}Reject With Guidance${RESET}`, `${DIM}Type feedback, Enter submit, Esc back${RESET}`, `> ${feedbackInput}`]
       : request.choices.map((c, i) => `${i === selectedChoiceIndex ? `${REVERSE}>${RESET}` : ' '} ${c.label}`)),
-    '', `${DIM}\u2191/\u2193 select \u2022 Enter confirm \u2022 Esc deny${RESET}`,
+    '', `${DIM}\u2191/\u2193 select \u00b7 Enter confirm \u00b7 Esc deny${RESET}`,
   ].join('\n')
 }
 

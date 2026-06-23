@@ -1,11 +1,11 @@
 /**
- * PowerCode TUI Design System
+ * PowerCode TUI - 色条标记设计系统
  *
- * 设计理念：无外框 + 独立卡片 + 语义色彩
- * - 主区域不使用外框，内容直接展示
- * - 工具/Agent 使用独立卡片，边框完整闭合
- * - 用户消息使用左侧色条强调
- * - 状态信息使用顶部/底部横幅
+ * 设计理念：无边框 + 左侧色条 + 语义色彩
+ * - 不使用任何边框字符（╭╮╰╯│─）
+ * - 使用左侧色条标记不同类型的内容
+ * - 使用颜色和符号区分状态
+ * - 干净、现代、不会出错
  */
 
 // ═══════════════════════════════════════════════════════════════
@@ -20,31 +20,32 @@ export const UNDERLINE = '\u001b[4m'
 export const REVERSE = '\u001b[7m'
 
 // ═══════════════════════════════════════════════════════════════
-// 语义色彩 (Tokyo Night 主题)
+// 语义色彩 (Tokyo Night)
 // ═══════════════════════════════════════════════════════════════
 
-// 背景层次 (从深到浅)
-export const BG_BASE = '\u001b[48;5;234m'      // #1a1b26 最深
-export const BG_SURFACE = '\u001b[48;5;236m'   // #24283b 面板
-export const BG_HIGHLIGHT = '\u001b[48;5;238m' // #2f3347 高亮行
+// 色条颜色（用于标记不同类型）
+export const BAR_USER = '\u001b[38;5;111m'     // 蓝色 - 用户消息
+export const BAR_TOOL = '\u001b[38;5;114m'     // 绿色 - 工具成功
+export const BAR_ERROR = '\u001b[38;5;210m'    // 红色 - 错误
+export const BAR_AGENT = '\u001b[38;5;141m'    // 紫色 - Agent
+export const BAR_ORCH = '\u001b[38;5;222m'     // 黄色 - 编排器
 
 // 前景层次
-export const FG = '\u001b[38;5;251m'           // #c0caf5 正文
-export const FG_DIM = '\u001b[38;5;245m'       // #565f89 次要
-export const FG_BRIGHT = '\u001b[38;5;255m'    // #ffffff 强调
-export const FG_DARK = '\u001b[38;5;236m'      // 深色文字 (用于浅背景)
+export const FG = '\u001b[38;5;251m'           // 正文
+export const FG_DIM = '\u001b[38;5;245m'       // 次要
+export const FG_BRIGHT = '\u001b[38;5;255m'    // 强调
 
 // 状态色
-export const SUCCESS = '\u001b[38;5;114m'      // #9ece6a 绿
-export const ERROR = '\u001b[38;5;210m'        // #f7768e 红
-export const WARNING = '\u001b[38;5;222m'      // #e0af68 黄
-export const INFO = '\u001b[38;5;117m'         // #7dcfff 青
+export const SUCCESS = '\u001b[38;5;114m'      // 绿
+export const ERROR = '\u001b[38;5;210m'        // 红
+export const WARNING = '\u001b[38;5;222m'      // 黄
+export const INFO = '\u001b[38;5;117m'         // 青
 
 // 强调色
-export const ACCENT = '\u001b[38;5;111m'       // #7aa2f7 蓝 (主品牌色)
-export const ACCENT2 = '\u001b[38;5;141m'      // #bb9af7 紫
+export const ACCENT = '\u001b[38;5;111m'       // 蓝
+export const ACCENT2 = '\u001b[38;5;141m'      // 紫
 
-// 基础16色 (兼容)
+// 基础16色
 export const CYAN = '\u001b[36m'
 export const GREEN = '\u001b[32m'
 export const YELLOW = '\u001b[33m'
@@ -56,12 +57,12 @@ export const BRIGHT_GREEN = '\u001b[92m'
 export const BRIGHT_RED = '\u001b[91m'
 export const BRIGHT_YELLOW = '\u001b[93m'
 
-// 边框色
-export const BORDER_DIM = '\u001b[38;5;240m'   // 暗灰边框
-export const BORDER_ACCENT = '\u001b[38;5;111m' // 蓝色边框 (聚焦)
+// 边框色（仅用于极少数必要场景）
+export const BORDER_DIM = '\u001b[38;5;240m'
+export const BORDER_ACCENT = '\u001b[38;5;111m'
 
-// 用户消息背景
-export const USER_BG = '\u001b[48;5;238m'      // 用户消息背景
+// 背景色
+export const USER_BG = '\u001b[48;5;238m'
 export const BLACK = '\u001b[30m'
 
 // 渐变色
