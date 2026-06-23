@@ -42,8 +42,11 @@ function sliceByDisplayColumns(input: string, startCol: number, endCol: number):
   let result = '', col = 0
   for (const ch of input) {
     const w = charDisplayWidth(ch), next = col + w
+    // 如果字符完全在起始列之前，跳过
     if (next <= startCol) { col = next; continue }
+    // 如果字符完全在结束列之后，停止
     if (col >= endCol) break
+    // 字符与选区有重叠，加入结果
     result += ch; col = next
   }
   return result
