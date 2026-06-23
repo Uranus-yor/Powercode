@@ -714,15 +714,13 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
   )
   const inputPanelLines = inputPanel.split('\n').length
 
-  // 运行动画提示
+  // 运行动画提示（固定位置，不影响输入框位置）
   let busyLine = ''
-  let busyLines = 0
   if (state.isBusy) {
     const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
     const frame = spinnerFrames[Math.floor(Date.now() / 100) % spinnerFrames.length]
     const toolInfo = state.activeTool ? ` ${DIM}\u00b7${RESET} ${state.activeTool}` : ''
     busyLine = `  ${WARNING}${frame}${RESET} ${state.status ?? 'working'}${toolInfo}`
-    busyLines = 1
   }
 
   // 斜杠菜单
@@ -737,18 +735,27 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
     menuLines = menuContent.split('\n').length
   }
 
+  // 固定区域高度：busy动画(1) + 输入面板 + 底部padding(2) + 斜杠菜单
+  const bottomFixedLines = 1 + inputPanelLines + 2 + menuLines
+
+  // 顶部 padding
+  const topPadding = 1
+
   // 计算需要填充的空行，把输入框推到底部
-  const usedLines = transcriptLines + 1 + inputPanelLines + busyLines + menuLines
+  const usedLines = topPadding + transcriptLines + bottomFixedLines
   const paddingLines = Math.max(0, rows - usedLines)
 
+  // 组装最终输出
+  for (let i = 0; i < topPadding; i++) parts.push('')  // 顶部 padding
   parts.push(transcriptContent)
-  for (let i = 0; i < paddingLines; i++) parts.push('')
+  for (let i = 0; i < paddingLines; i++) parts.push('')  // 中间填充
+  parts.push(busyLine || '')  // busy 动画（固定位置，有或没有都占一行）
   parts.push(inputPanel)
-  if (busyLine) parts.push(busyLine)
+  for (let i = 0; i < 2; i++) parts.push('')  // 底部 padding
   if (menuContent) parts.push(menuContent)
 
   // 计算光标位置（输入框固定在底部）
-  const inputRow = rows - inputPanelLines + 2 - busyLines - menuLines  // 输入行在输入面板中的位置
+  const inputRow = rows - 2 - menuLines - 1  // 底部padding(2) + 斜杠菜单 + 输入面板偏移
   const inputText = state.input ?? ''
   const beforeCursor = inputText.slice(0, Math.min(state.cursorOffset, inputText.length))
   const cursorCol = leftPad + 4 + stringDisplayWidth(beforeCursor)
