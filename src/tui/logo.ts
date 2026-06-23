@@ -1,23 +1,10 @@
-import { charDisplayWidth } from './chrome.js'
+import { charDisplayWidth, stringDisplayWidth } from './chrome.js'
 import {
   RESET, DIM, BOLD,
-  BORDER,
-  STATUS_SUCCESS,
-  applyGradient,
+  BORDER_DIM, BORDER_ACCENT,
+  SUCCESS, ACCENT,
+  applyGradient, stripAnsi,
 } from './colors.js'
-
-// ═══════════════════════════════════════════════════════════════
-// 工具函数
-// ═══════════════════════════════════════════════════════════════
-
-function stripAnsi(str: string): string {
-  return str.replace(/\u001b\[[0-9;]*m/g, '')
-}
-
-function stringDisplayWidth(str: string): number {
-  const stripped = stripAnsi(str)
-  return [...stripped].reduce((sum, ch) => sum + charDisplayWidth(ch), 0)
-}
 
 // ═══════════════════════════════════════════════════════════════
 // Logo ASCII Art
@@ -32,83 +19,54 @@ const LOGO_ART: string[] = [
 ]
 
 // ═══════════════════════════════════════════════════════════════
-// 面板边框
+// 渲染居中Logo
 // ═══════════════════════════════════════════════════════════════
 
-const BORDER_CHARS = {
-  topLeft: '╭',
-  topRight: '╮',
-  bottomLeft: '╰',
-  bottomRight: '╯',
-  horizontal: '─',
-  vertical: '│',
-} as const
-
-function borderLine(kind: 'top' | 'bottom', width: number): string {
-  const inner = Math.max(0, width - 2)
-  if (kind === 'top') {
-    return `${BORDER}${BORDER_CHARS.topLeft}${BORDER_CHARS.horizontal.repeat(inner)}${BORDER_CHARS.topRight}${RESET}`
-  }
-  return `${BORDER}${BORDER_CHARS.bottomLeft}${BORDER_CHARS.horizontal.repeat(inner)}${BORDER_CHARS.bottomRight}${RESET}`
-}
-
-function emptyRow(width: number): string {
-  return `${BORDER}${BORDER_CHARS.vertical}${RESET}${' '.repeat(Math.max(0, width - 2))}${BORDER}${BORDER_CHARS.vertical}${RESET}`
-}
-
-function contentRow(content: string, width: number): string {
-  const plain = stripAnsi(content)
-  let visible = 0
-  for (const ch of plain) visible += charDisplayWidth(ch)
-  const inner = width - 3
-  if (visible > inner) {
-    let truncated = ''
-    let w = 0
-    for (const ch of plain) {
-      const cw = charDisplayWidth(ch)
-      if (w + cw > inner) break
-      truncated += ch
-      w += cw
-    }
-    return `${BORDER}${BORDER_CHARS.vertical}${RESET} ${truncated}${BORDER}${BORDER_CHARS.vertical}${RESET}`
-  }
-  const pad = Math.max(0, inner - visible)
-  return `${BORDER}${BORDER_CHARS.vertical}${RESET} ${content}${' '.repeat(pad)}${BORDER}${BORDER_CHARS.vertical}${RESET}`
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 导出渲染函数
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * 渲染居中的PowerCode Logo
- */
 export function renderCenteredLogo(terminalWidth: number): string {
   const lines: string[] = []
   lines.push('')
   for (const line of LOGO_ART) {
-    const textWidth = stripAnsi(line).length
-    const padding = Math.max(0, Math.floor((terminalWidth - textWidth) / 2))
-    lines.push(' '.repeat(padding) + applyGradient(line))
+    const w = stripAnsi(line).length
+    const pad = Math.max(0, Math.floor((terminalWidth - w) / 2))
+    lines.push(' '.repeat(pad) + applyGradient(line))
   }
   lines.push('')
   return lines.join('\n')
 }
 
-/**
- * 渲染输入面板
- */
+// ═══════════════════════════════════════════════════════════════
+// 渲染输入面板 - 简洁现代设计
+// ═══════════════════════════════════════════════════════════════
+
+const B = {
+  tl: '╭', tr: '╮', bl: '╰', br: '╯',
+  h: '─', v: '│',
+} as const
+
 export function renderInputPanel(
   width: number,
-  leftPadOrTerminalWidth: number,
+  leftPad: number,
   modelName?: string,
   contextPercent?: number,
   input?: string,
   cursorOffset?: number,
 ): string {
-  const leftPad = leftPadOrTerminalWidth
   const pad = ' '.repeat(leftPad)
-  const inner = Math.max(0, width - 4)
+  const inner = Math.max(0, width - 2)
+  const result: string[] = []
+
+  // 顶部边框
+  const titlePart = ` ${BOLD}${applyGradient('PowerCode')}${RESET}${BORDER_DIM} `
+  const titleW = stringDisplayWidth('PowerCode') + 4
+
+  // 右侧: model + ctx
+  const model = modelName ? `${DIM}model${RESET} ${SUCCESS}${modelName}${RESET}` : ''
+  const ctx = contextPercent !== undefined ? `${DIM}ctx${RESET} ${ACCENT}${contextPercent}%${RESET}` : ''
+  const rightInfo = [model, ctx].filter(Boolean).join(` ${DIM}\u2022${RESET} `)
+  const rightW = stringDisplayWidth(rightInfo) + 2
+
+  const dashN = Math.max(1, inner - titleW - rightW)
+  result.push(`${pad}${BORDER_DIM}${B.tl}${B.h}${RESET}${titlePart}${BORDER_DIM}${B.h.repeat(dashN)} ${rightInfo} ${B.tr}${RESET}`)
 
   // 输入行
   const offset = Math.max(0, Math.min(cursorOffset ?? 0, (input ?? '').length))
@@ -117,75 +75,59 @@ export function renderInputPanel(
   const cursor = text[offset] ?? ' '
   let after = text.slice(Math.min(offset + 1, text.length))
 
-  // 截断输入以适应宽度
-  const maxInputWidth = Math.max(0, inner - 2)
-  const beforeWidth = stringDisplayWidth(before)
-  const afterWidth = stringDisplayWidth(after)
-  if (beforeWidth + afterWidth > maxInputWidth) {
-    if (beforeWidth > maxInputWidth - 1) {
-      let w = 0
-      let startIdx = 0
+  // 截断
+  const maxInputW = Math.max(0, inner - 6)
+  const beforeW = stringDisplayWidth(before)
+  const afterW = stringDisplayWidth(after)
+  if (beforeW + afterW > maxInputW) {
+    if (beforeW > maxInputW - 1) {
+      let w = 0, si = 0
       for (let i = 0; i < before.length; i++) {
         const cw = charDisplayWidth(before[i] ?? '')
-        if (w + cw > beforeWidth - (maxInputWidth - 1)) {
-          startIdx = i
-          break
-        }
+        if (w + cw > beforeW - (maxInputW - 1)) { si = i; break }
         w += cw
       }
-      before = '\u2026' + before.slice(startIdx + 1)
+      before = '\u2026' + before.slice(si + 1)
     }
-    const remaining = maxInputWidth - stringDisplayWidth(before)
-    if (afterWidth > remaining) {
-      let w = 0
-      let endIdx = after.length
+    const rem = maxInputW - stringDisplayWidth(before)
+    if (afterW > rem) {
+      let w = 0, ei = after.length
       for (let i = 0; i < after.length; i++) {
         const cw = charDisplayWidth(after[i] ?? '')
-        if (w + cw > remaining - 1) {
-          endIdx = i
-          break
-        }
+        if (w + cw > rem - 1) { ei = i; break }
         w += cw
       }
-      after = after.slice(0, endIdx) + '\u2026'
+      after = after.slice(0, ei) + '\u2026'
     }
   }
-  const inputContent = `${STATUS_SUCCESS}${BOLD}>${RESET}${before}${cursor}${after}`
 
-  // 品牌行: PowerCode 左侧，model+ctx 右侧
-  const left = applyGradient('PowerCode')
-  const model = modelName ? `${DIM}${modelName}${RESET}` : ''
-  const ctx = contextPercent !== undefined ? `${contextPercent}%` : '\u2591\u2591\u2591\u2591\u2591\u2591'
-  const right = `${model}  ${DIM}ctx${RESET} ${ctx}`
-  const rightLen = stringDisplayWidth(right)
-  const leftPadCount = Math.max(0, inner - rightLen - stringDisplayWidth(left))
-  const brandContent = left + ' '.repeat(leftPadCount) + right
+  const inputContent = `${SUCCESS}${BOLD}>${RESET} ${before}${cursor}${after}`
+  result.push(`${pad}${BORDER_DIM}${B.v}${RESET} ${inputContent}${' '.repeat(Math.max(0, inner - 2 - stringDisplayWidth(inputContent) - 1))}${BORDER_DIM}${B.v}${RESET}`)
 
-  const rows = [
-    pad + borderLine('top', width),
-    pad + contentRow(inputContent, width),
-    pad + emptyRow(width),
-    pad + contentRow(brandContent, width),
-    pad + borderLine('bottom', width),
-  ]
-  return rows.join('\n')
+  // 底部边框
+  result.push(`${pad}${BORDER_DIM}${B.bl}${B.h.repeat(inner)}${B.br}${RESET}`)
+
+  // 快捷键提示
+  result.push(`${pad}  ${DIM}Enter${RESET} send ${DIM}\u2022${RESET} ${DIM}/help${RESET} commands ${DIM}\u2022${RESET} ${DIM}Esc${RESET} clear ${DIM}\u2022${RESET} ${DIM}Ctrl+C${RESET} exit`)
+
+  return result.join('\n')
 }
 
 /**
- * 渲染会话面板（用于启动界面）
+ * 渲染会话面板（用于 session picker 等）
  */
-export function renderTranscriptPanel(
-  content: string,
-  width: number,
-  terminalWidth: number,
-): string {
+export function renderTranscriptPanel(content: string, width: number, terminalWidth: number): string {
   const leftPad = Math.max(0, Math.floor((terminalWidth - width) / 2))
   const pad = ' '.repeat(leftPad)
+  const inner = width - 2
 
-  const rows = [pad + borderLine('top', width)]
+  const result: string[] = []
+  result.push(`${pad}${BORDER_DIM}${B.tl}${B.h.repeat(inner)}${B.tr}${RESET}`)
   for (const line of content.split('\n')) {
-    rows.push(pad + contentRow(line, width))
+    const w = stringDisplayWidth(line)
+    const p = Math.max(0, inner - w)
+    result.push(`${pad}${BORDER_DIM}${B.v}${RESET} ${line}${' '.repeat(p)}${BORDER_DIM}${B.v}${RESET}`)
   }
-  rows.push(pad + borderLine('bottom', width))
-  return rows.join('\n')
+  result.push(`${pad}${BORDER_DIM}${B.bl}${B.h.repeat(inner)}${B.br}${RESET}`)
+  return result.join('\n')
 }

@@ -6,12 +6,13 @@ import type { SlashCommand } from '../cli-commands.js'
 import type { PermissionRequest } from '../permissions.js'
 import {
   RESET, DIM, BOLD, REVERSE,
-  BORDER,
-  STATUS_SUCCESS, STATUS_ERROR, STATUS_WARNING, STATUS_RUNNING,
-  ACCENT_PRIMARY,
-  BRIGHT_CYAN, BRIGHT_RED, BRIGHT_GREEN, BRIGHT_YELLOW,
+  BORDER_DIM, BORDER_ACCENT,
+  FG, FG_DIM, FG_BRIGHT,
+  SUCCESS, ERROR, WARNING, INFO,
+  ACCENT, ACCENT2,
+  BRIGHT_CYAN, BRIGHT_GREEN, BRIGHT_RED, BRIGHT_YELLOW,
   CYAN, GREEN, YELLOW, BLUE, MAGENTA,
-  colorBadge,
+  stripAnsi, applyGradient,
 } from './colors.js'
 
 // ═══════════════════════════════════════════════════════════════
@@ -21,13 +22,9 @@ import {
 export function charDisplayWidth(char: string): number {
   const code = char.codePointAt(0)
   if (code === undefined) return 0
-
   if (
     code >= 0x1100 &&
-    (
-      code <= 0x115f ||
-      code === 0x2329 ||
-      code === 0x232a ||
+    (code <= 0x115f || code === 0x2329 || code === 0x232a ||
       (code >= 0x2e80 && code <= 0xa4cf && code !== 0x303f) ||
       (code >= 0xac00 && code <= 0xd7a3) ||
       (code >= 0xf900 && code <= 0xfaff) ||
@@ -36,17 +33,13 @@ export function charDisplayWidth(char: string): number {
       (code >= 0xff00 && code <= 0xff60) ||
       (code >= 0xffe0 && code <= 0xffe6) ||
       (code >= 0x1f300 && code <= 0x1faf6) ||
-      (code >= 0x20000 && code <= 0x3fffd)
-    )
-  ) {
-    return 2
-  }
-
+      (code >= 0x20000 && code <= 0x3fffd))
+  ) return 2
   return 1
 }
 
 export function stringDisplayWidth(input: string): number {
-  return [...stripAnsi(input)].reduce((sum, char) => sum + charDisplayWidth(char), 0)
+  return [...stripAnsi(input)].reduce((sum, c) => sum + charDisplayWidth(c), 0)
 }
 
 export function displayWidth(str: string): number {
@@ -54,12 +47,8 @@ export function displayWidth(str: string): number {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 文本处理工具
+// 文本处理
 // ═══════════════════════════════════════════════════════════════
-
-function stripAnsi(input: string): string {
-  return input.replace(/\u001b\[[0-9;]*m/g, '')
-}
 
 function truncatePlain(input: string, width: number): string {
   if (width <= 0) return ''
@@ -85,285 +74,228 @@ function padPlain(input: string, width: number): string {
 function truncatePathMiddle(input: string, width: number): string {
   if (width <= 0 || stringDisplayWidth(input) <= width) return input
   if (width <= 5) return truncatePlain(input, width)
-
   const keep = width - 3
   const leftTarget = Math.ceil(keep / 2)
   const rightTarget = Math.floor(keep / 2)
-
-  let left = ''
-  let leftWidth = 0
+  let left = '', leftWidth = 0
   for (const char of [...input]) {
     const next = charDisplayWidth(char)
     if (leftWidth + next > leftTarget) break
     left += char
     leftWidth += next
   }
-
-  let right = ''
-  let rightWidth = 0
+  let right = '', rightWidth = 0
   for (const char of [...input].reverse()) {
     const next = charDisplayWidth(char)
     if (rightWidth + next > rightTarget) break
     right = `${char}${right}`
     rightWidth += next
   }
-
   return `${left}...${right}`
 }
 
-function joinSegmentsWithinWidth(
-  segments: string[],
-  separator: string,
-  maxWidth: number,
-): string {
-  if (maxWidth <= 0 || segments.length === 0) {
-    return ''
-  }
-
+function joinWithinWidth(segments: string[], sep: string, max: number): string {
+  if (max <= 0 || segments.length === 0) return ''
   let output = ''
-  for (const segment of segments) {
-    const candidate = output.length > 0 ? `${output}${separator}${segment}` : segment
-    if (stringDisplayWidth(candidate) <= maxWidth) {
-      output = candidate
-      continue
-    }
-
-    if (!output) {
-      return truncatePlain(stripAnsi(segment), maxWidth)
-    }
-
-    const withEllipsis = `${output}${separator}${DIM}...${RESET}`
-    if (stringDisplayWidth(withEllipsis) <= maxWidth) {
-      return withEllipsis
-    }
-
-    return output
+  for (const seg of segments) {
+    const candidate = output.length > 0 ? `${output}${sep}${seg}` : seg
+    if (stringDisplayWidth(candidate) <= max) { output = candidate; continue }
+    if (!output) return truncatePlain(stripAnsi(seg), max)
+    const withDots = `${output}${sep}${DIM}...${RESET}`
+    return stringDisplayWidth(withDots) <= max ? withDots : output
   }
-
   return output
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 边框样式系统
+// 卡片组件 - 核心设计单元
 // ═══════════════════════════════════════════════════════════════
 
-/** 圆角边框字符集 */
-const BORDER_CHARS = {
-  // 单线边框
-  single: {
-    topLeft: '╭',
-    topRight: '╮',
-    bottomLeft: '╰',
-    bottomRight: '╯',
-    horizontal: '─',
-    vertical: '│',
-  },
-  // 双线边框（用于强调）
-  double: {
-    topLeft: '╔',
-    topRight: '╗',
-    bottomLeft: '╚',
-    bottomRight: '╝',
-    horizontal: '═',
-    vertical: '║',
-  },
-  // T型连接符
-  tee: {
-    left: '├',
-    right: '┤',
-    down: '┬',
-    up: '┴',
-    cross: '┼',
-  },
+const B = {
+  tl: '╭', tr: '╮', bl: '╰', br: '╯',
+  h: '─', v: '│',
 } as const
 
-/** 创建顶部边框线 */
-function _borderLineTop(width: number): string {
-  const inner = Math.max(0, width - 2)
-  return `${BORDER}${BORDER_CHARS.single.topLeft}${BORDER_CHARS.single.horizontal.repeat(inner)}${BORDER_CHARS.single.topRight}${RESET}`
-}
+/**
+ * 渲染一个完整闭合的卡片
+ * @param title 卡片标题
+ * @param lines 内容行（原始字符串，会自动处理宽度）
+ * @param width 卡片总宽度
+ * @param rightTitle 右侧标题（可选）
+ */
+export function renderCard(
+  title: string,
+  lines: string[],
+  width: number,
+  rightTitle?: string,
+): string {
+  const inner = width - 2
+  const result: string[] = []
 
-/** 创建底部边框线 */
-function borderLineBottom(width: number): string {
-  const inner = Math.max(0, width - 2)
-  return `${BORDER}${BORDER_CHARS.single.bottomLeft}${BORDER_CHARS.single.horizontal.repeat(inner)}${BORDER_CHARS.single.bottomRight}${RESET}`
-}
-
-/** 创建带标题的顶部边框线 - 使用双线边框强调标题 */
-function borderLineTopWithTitle(width: number, title: string, rightTitle?: string): string {
-  const inner = Math.max(0, width - 2)
-  const titleStr = ` ${BOLD}${ACCENT_PRIMARY}${title}${RESET}${BORDER} `
-  const titleWidth = stringDisplayWidth(title) + 4
-
-  let rightStr = ''
-  let rightWidth = 0
+  // 顶部: ╭─ title ───────── rightTitle ─╮
+  const titlePart = ` ${BOLD}${ACCENT}${title}${RESET}${BORDER_DIM} `
+  const titleW = stringDisplayWidth(title) + 2
+  let rightPart = '', rightW = 0
   if (rightTitle) {
-    const truncated = truncatePlain(rightTitle, Math.max(10, Math.floor(width * 0.3)))
-    rightStr = ` ${DIM}${truncated}${RESET}${BORDER} `
-    rightWidth = stringDisplayWidth(truncated) + 2
+    const rt = truncatePlain(rightTitle, Math.floor(width * 0.3))
+    rightPart = ` ${DIM}${rt}${RESET}${BORDER_DIM} `
+    rightW = stringDisplayWidth(rt) + 2
   }
+  const dashN = Math.max(1, inner - titleW - rightW)
+  result.push(`${BORDER_DIM}${B.tl}${B.h}${RESET}${titlePart}${BORDER_DIM}${B.h.repeat(dashN)}${RESET}${rightPart}${BORDER_DIM}${B.tr}${RESET}`)
 
-  const dashCount = Math.max(0, inner - titleWidth - rightWidth)
-  const dashes = BORDER_CHARS.single.horizontal.repeat(dashCount)
-
-  return `${BORDER}${BORDER_CHARS.single.topLeft}${BORDER_CHARS.single.horizontal}${titleStr}${dashes}${rightStr}${BORDER_CHARS.single.topRight}${RESET}`
-}
-
-/** 创建面板行 */
-function panelRow(content: string, width: number): string {
-  const inner = Math.max(0, width - 4)
-  const contentWidth = stringDisplayWidth(content)
-  const padding = Math.max(0, inner - contentWidth)
-  return `${BORDER}${BORDER_CHARS.single.vertical}${RESET} ${content}${' '.repeat(padding)} ${BORDER}${BORDER_CHARS.single.vertical}${RESET}`
-}
-
-/** 创建空面板行 */
-function emptyPanelRow(width: number): string {
-  return `${BORDER}${BORDER_CHARS.single.vertical}${RESET}${' '.repeat(Math.max(0, width - 2))}${BORDER}${BORDER_CHARS.single.vertical}${RESET}`
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 面板包裹
-// ═══════════════════════════════════════════════════════════════
-
-export function wrapPanelBodyLine(line: string, width: number): string[] {
-  const inner = Math.max(0, width - 4)
-  if (inner <= 0) return ['']
-
-  const hasAnsi = /\u001b\[[0-9;]*m/.test(line)
-  if (!hasAnsi) {
-    if (stringDisplayWidth(line) <= inner) return [line]
-    const parts: string[] = []
-    let current = ''
-    let currentWidth = 0
-    for (const char of [...line]) {
-      const charWidth = charDisplayWidth(char)
-      if (currentWidth + charWidth > inner) {
-        parts.push(current)
-        current = char
-        currentWidth = charWidth
-        continue
+  // 内容行: │ content │
+  for (const line of lines) {
+    const plain = stripAnsi(line)
+    const w = stringDisplayWidth(line)
+    const maxW = inner - 2
+    let displayLine = line
+    if (w > maxW) {
+      // 截断
+      let cur = '', curW = 0
+      for (const ch of [...plain]) {
+        const cw = charDisplayWidth(ch)
+        if (curW + cw > maxW - 3) break
+        cur += ch
+        curW += cw
       }
-      current += char
-      currentWidth += charWidth
+      displayLine = `${cur}...`
     }
-    if (current.length > 0) parts.push(current)
-    return parts
+    const pad = Math.max(0, inner - 2 - stringDisplayWidth(displayLine))
+    result.push(`${BORDER_DIM}${B.v}${RESET} ${displayLine}${' '.repeat(pad)} ${BORDER_DIM}${B.v}${RESET}`)
   }
 
-  const plain = stripAnsi(line)
-  if (stringDisplayWidth(plain) <= inner) return [line]
+  // 底部: ╰─────────────────────────────╯
+  result.push(`${BORDER_DIM}${B.bl}${B.h.repeat(inner)}${B.br}${RESET}`)
 
-  const parts: string[] = []
-  let plainIdx = 0
-  let lineIdx = 0
-  let currentWidth = 0
-  let partStart = 0
-
-  while (plainIdx < plain.length && lineIdx < line.length) {
-    const ansiMatch = line.slice(lineIdx).match(/^\u001b\[[0-9;]*m/)
-    if (ansiMatch) {
-      lineIdx += ansiMatch[0].length
-      continue
-    }
-
-    const char = plain[plainIdx]
-    const charWidth = charDisplayWidth(char)
-
-    if (currentWidth + charWidth > inner) {
-      parts.push(line.slice(partStart, lineIdx))
-      partStart = lineIdx
-      currentWidth = 0
-      continue
-    }
-
-    currentWidth += charWidth
-    plainIdx++
-    lineIdx++
-  }
-
-  if (lineIdx > partStart) {
-    parts.push(line.slice(partStart))
-  }
-
-  return parts.length > 0 ? parts : ['']
+  return result.join('\n')
 }
 
 /**
- * 渲染面板组件
- * 
- * @param title - 面板标题
- * @param body - 面板内容
- * @param options - 配置选项
- * @returns 渲染后的面板字符串
+ * 渲染行分割线
  */
+export function renderDivider(width: number, label?: string): string {
+  if (!label) {
+    return `${BORDER_DIM}${B.h.repeat(width)}${RESET}`
+  }
+  const labelW = stringDisplayWidth(label) + 2
+  const dashN = Math.max(1, width - labelW)
+  return `${BORDER_DIM}${B.h.repeat(Math.floor(dashN / 2))} ${DIM}${label}${RESET} ${BORDER_DIM}${B.h.repeat(Math.ceil(dashN / 2))}${RESET}`
+}
+
+/**
+ * 渲染空行（带边框）
+ */
+function emptyRow(width: number): string {
+  const inner = width - 2
+  return `${BORDER_DIM}${B.v}${RESET}${' '.repeat(inner)}${BORDER_DIM}${B.v}${RESET}`
+}
+
+/**
+ * 渲染内容行（带边框）
+ */
+function contentRow(content: string, width: number): string {
+  const inner = width - 2
+  const w = stringDisplayWidth(content)
+  const pad = Math.max(0, inner - w)
+  return `${BORDER_DIM}${B.v}${RESET} ${content}${' '.repeat(pad)}${BORDER_DIM}${B.v}${RESET}`
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 会话内容行包裹（用于 transcript 内部的长行换行）
+// ═══════════════════════════════════════════════════════════════
+
+export function wrapPanelBodyLine(line: string, width: number): string[] {
+  const maxW = width
+  if (maxW <= 0) return ['']
+  const hasAnsi = /\u001b\[[0-9;]*m/.test(line)
+  if (!hasAnsi) {
+    if (stringDisplayWidth(line) <= maxW) return [line]
+    const parts: string[] = []
+    let cur = '', curW = 0
+    for (const ch of [...line]) {
+      const cw = charDisplayWidth(ch)
+      if (curW + cw > maxW) { parts.push(cur); cur = ch; curW = cw; continue }
+      cur += ch; curW += cw
+    }
+    if (cur.length > 0) parts.push(cur)
+    return parts
+  }
+  const plain = stripAnsi(line)
+  if (stringDisplayWidth(plain) <= maxW) return [line]
+  const parts: string[] = []
+  let pi = 0, li = 0, curW = 0, ps = 0
+  while (pi < plain.length && li < line.length) {
+    const m = line.slice(li).match(/^\u001b\[[0-9;]*m/)
+    if (m) { li += m[0].length; continue }
+    const ch = plain[pi], cw = charDisplayWidth(ch)
+    if (curW + cw > maxW) { parts.push(line.slice(ps, li)); ps = li; curW = 0; continue }
+    curW += cw; pi++; li++
+  }
+  if (li > ps) parts.push(line.slice(ps))
+  return parts.length > 0 ? parts : ['']
+}
+
+// ═══════════════════════════════════════════════════════════════
+// renderPanel - 保留兼容（用于 session picker 等）
+// ═══════════════════════════════════════════════════════════════
+
 export function renderPanel(
   title: string,
   body: string,
-  options: {
-    rightTitle?: string
-    minBodyLines?: number
-    width?: number
-  } = {},
+  options: { rightTitle?: string; minBodyLines?: number; width?: number } = {},
 ): string {
   const width = options.width ?? Math.max(60, process.stdout.columns ?? 100)
   const bodyLines = body.length > 0 ? body.split('\n') : []
-  const renderedLines = bodyLines.flatMap(line => wrapPanelBodyLine(line, width))
+  const renderedLines = bodyLines.flatMap(l => wrapPanelBodyLine(l, width - 4))
   const minBodyLines = options.minBodyLines ?? 0
-  while (renderedLines.length < minBodyLines) {
-    renderedLines.push('')
-  }
+  while (renderedLines.length < minBodyLines) renderedLines.push('')
 
-  return [
-    borderLineTopWithTitle(width, title, options.rightTitle),
-    emptyPanelRow(width),
-    ...renderedLines.map(line => panelRow(line, width)),
-    borderLineBottom(width),
-  ].join('\n')
+  const inner = width - 2
+  const result: string[] = []
+
+  // 顶部
+  const titlePart = ` ${BOLD}${ACCENT}${title}${RESET}${BORDER_DIM} `
+  const titleW = stringDisplayWidth(title) + 2
+  let rightPart = '', rightW = 0
+  if (options.rightTitle) {
+    const rt = truncatePlain(options.rightTitle, Math.floor(width * 0.3))
+    rightPart = ` ${DIM}${rt}${RESET}${BORDER_DIM} `
+    rightW = stringDisplayWidth(rt) + 2
+  }
+  const dashN = Math.max(1, inner - titleW - rightW)
+  result.push(`${BORDER_DIM}${B.tl}${B.h}${RESET}${titlePart}${BORDER_DIM}${B.h.repeat(dashN)}${RESET}${rightPart}${BORDER_DIM}${B.tr}${RESET}`)
+
+  result.push(emptyRow(width))
+  for (const line of renderedLines) result.push(contentRow(line, width))
+  result.push(`${BORDER_DIM}${B.bl}${B.h.repeat(inner)}${B.br}${RESET}`)
+
+  return result.join('\n')
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 状态指示器
+// 上下文使用率徽章
 // ═══════════════════════════════════════════════════════════════
 
-/** 渲染上下文使用率徽章 */
 export function renderContextBadge(stats: {
   utilization: number
   warningLevel: 'normal' | 'warning' | 'critical' | 'blocked'
-  accounting?: {
-    providerUsageTokens: number
-    estimatedTokens: number
-    source: 'provider_usage' | 'provider_usage_plus_estimate' | 'estimate_only'
-  }
+  accounting?: { providerUsageTokens: number; estimatedTokens: number; source: string } | null
 }): string {
   const { utilization, warningLevel, accounting } = stats
-  const percent = Math.round(utilization * 100)
-
-  const colorMap = {
-    normal: STATUS_SUCCESS,
-    warning: STATUS_WARNING,
-    critical: STATUS_ERROR,
-    blocked: BRIGHT_RED,
-  }
+  const pct = Math.round(utilization * 100)
+  const colorMap = { normal: SUCCESS, warning: WARNING, critical: ERROR, blocked: BRIGHT_RED }
   const color = colorMap[warningLevel]
-
   const filled = Math.round(utilization * 10)
   const bar = '\u2593'.repeat(filled) + '\u2591'.repeat(10 - filled)
-  const sourceLabel =
-    accounting?.source === 'provider_usage'
-      ? 'usage'
-      : accounting?.source === 'provider_usage_plus_estimate'
-        ? 'usage+est'
-        : accounting?.source === 'estimate_only'
-          ? 'est'
-          : ''
-  const suffix = sourceLabel ? ` ${DIM}${sourceLabel}${RESET}` : ''
-
-  return colorBadge('ctx', `${percent}% ${bar}${suffix}`, color)
+  const src = accounting?.source === 'provider_usage' ? ' usage'
+    : accounting?.source === 'provider_usage_plus_estimate' ? ' usage+est'
+    : accounting?.source === 'estimate_only' ? ' est' : ''
+  return `${color}ctx${RESET} ${color}${pct}%${RESET} ${DIM}${bar}${src}${RESET}`
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 顶部横幅
+// 顶部横幅 - 系统信息
 // ═══════════════════════════════════════════════════════════════
 
 export function renderBanner(
@@ -371,81 +303,66 @@ export function renderBanner(
   cwd: string,
   permissionSummary: string[],
   session: {
-    transcriptCount: number
-    messageCount: number
-    skillCount: number
-    mcpTotalCount: number
-    mcpConnectedCount: number
-    mcpConnectingCount: number
-    mcpErrorCount: number
-    contextStats?: {
-      utilization: number
-      warningLevel: 'normal' | 'warning' | 'critical' | 'blocked'
-      accounting?: {
-        providerUsageTokens: number
-        estimatedTokens: number
-        source: 'provider_usage' | 'provider_usage_plus_estimate' | 'estimate_only'
-      }
-    } | null
+    transcriptCount: number; messageCount: number; skillCount: number
+    mcpTotalCount: number; mcpConnectedCount: number
+    mcpConnectingCount: number; mcpErrorCount: number
+    contextStats?: { utilization: number; warningLevel: 'normal' | 'warning' | 'critical' | 'blocked'; accounting?: { providerUsageTokens: number; estimatedTokens: number; source: string } | null } | null
   },
 ): string {
-  const panelWidth = Math.max(60, process.stdout.columns ?? 100)
-  const panelInner = Math.max(0, panelWidth - 4)
+  const width = Math.max(60, process.stdout.columns ?? 100)
+  const inner = width - 2
   const cwdName = path.basename(cwd) || cwd
   const model = runtime?.model ?? 'not-configured'
   const provider = runtime?.baseUrl
     ? runtime.baseUrl.replace(/^https?:\/\//, '').split('/')[0] || 'custom'
     : 'offline'
-  const pathBudget = Math.max(20, panelInner - 28)
-  const projectLine = `${ACCENT_PRIMARY}${BOLD}${truncatePlain(cwdName, 24)}${RESET} ${DIM}${truncatePathMiddle(cwd, pathBudget)}${RESET}`
-  const permissionLine =
-    permissionSummary.length > 0
-      ? `${DIM}${truncatePlain(permissionSummary.join(' | '), Math.max(24, panelInner))}${RESET}`
-      : `${DIM}permissions: ask on sensitive actions${RESET}`
-  const metaBadges = [
-    colorBadge('session', 'local', BRIGHT_YELLOW),
-    colorBadge('provider', provider, CYAN),
-    colorBadge('model', model, GREEN),
-    colorBadge('messages', String(session.messageCount), BRIGHT_CYAN),
-    colorBadge('events', String(session.transcriptCount), BLUE),
-    ...(session.contextStats ? [renderContextBadge(session.contextStats)] : []),
-    colorBadge('skills', String(session.skillCount), BRIGHT_GREEN),
-    colorBadge(
-      'mcp',
-      `${session.mcpConnectedCount}/${session.mcpTotalCount}`,
-      MAGENTA,
-    ),
-    ...(session.mcpConnectingCount > 0
-      ? [colorBadge('mcp-wait', String(session.mcpConnectingCount), YELLOW)]
-      : []),
-    ...(session.mcpErrorCount > 0
-      ? [colorBadge('mcp-err', String(session.mcpErrorCount), BRIGHT_RED)]
-      : []),
-  ]
-  const metaLine = joinSegmentsWithinWidth(metaBadges, '  ', panelInner)
 
-  return renderPanel(
-    'PowerCode',
-    [
-      `${DIM}Terminal coding assistant with a card-style session layout.${RESET}`,
-      '',
-      projectLine,
-      metaLine,
-      permissionLine,
-    ].join('\n'),
-    {
-      rightTitle: provider,
-    },
-  )
+  // 行1: 项目路径
+  const pathBudget = Math.max(20, inner - 20)
+  const line1 = `${ACCENT}${BOLD}${truncatePlain(cwdName, 24)}${RESET} ${DIM}${truncatePathMiddle(cwd, pathBudget)}${RESET}`
+
+  // 行2: 元数据徽章
+  const badges = [
+    `${DIM}model${RESET} ${GREEN}${model}${RESET}`,
+    `${DIM}provider${RESET} ${CYAN}${provider}${RESET}`,
+    `${DIM}msgs${RESET} ${BRIGHT_CYAN}${session.messageCount}${RESET}`,
+    `${DIM}events${RESET} ${BLUE}${session.transcriptCount}${RESET}`,
+    ...(session.contextStats ? [renderContextBadge(session.contextStats)] : []),
+    `${DIM}skills${RESET} ${BRIGHT_GREEN}${session.skillCount}${RESET}`,
+    `${DIM}mcp${RESET} ${MAGENTA}${session.mcpConnectedCount}/${session.mcpTotalCount}${RESET}`,
+    ...(session.mcpErrorCount > 0 ? [`${DIM}err${RESET} ${BRIGHT_RED}${session.mcpErrorCount}${RESET}`] : []),
+  ]
+  const line2 = joinWithinWidth(badges, ` ${DIM}\u2022${RESET} `, inner - 2)
+
+  // 行3: 权限
+  const permText = permissionSummary.length > 0
+    ? permissionSummary.join(' | ')
+    : 'permissions: ask on sensitive actions'
+  const line3 = `${DIM}${truncatePlain(permText, inner - 2)}${RESET}`
+
+  // 渲染
+  const inner2 = width - 2
+  const titlePart = ` ${BOLD}${applyGradient('PowerCode')}${RESET}${BORDER_DIM} `
+  const titleW = stringDisplayWidth('PowerCode') + 4
+  const dashN = Math.max(1, inner2 - titleW)
+
+  const result: string[] = []
+  result.push(`${BORDER_DIM}${B.tl}${B.h}${RESET}${titlePart}${BORDER_DIM}${B.h.repeat(dashN)}${B.tr}${RESET}`)
+  result.push(contentRow(line1, width))
+  result.push(contentRow(line2, width))
+  result.push(contentRow(line3, width))
+  result.push(`${BORDER_DIM}${B.bl}${B.h.repeat(inner2)}${B.br}${RESET}`)
+
+  return result.join('\n')
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 状态栏
+// 底部状态栏
 // ═══════════════════════════════════════════════════════════════
 
 export function renderStatusLine(status: string | null): string {
-  if (!status) return `${DIM}Ready${RESET}`
-  return `${STATUS_WARNING}${BOLD}${status}${RESET}`
+  if (!status) return `${DIM}ready${RESET}`
+  return `${WARNING}${BOLD}${status}${RESET}`
 }
 
 export function renderToolPanel(
@@ -454,89 +371,58 @@ export function renderToolPanel(
   backgroundTasks: BackgroundTask[] = [],
 ): string {
   const items: string[] = []
-
-  if (activeTool) {
-    items.push(`${STATUS_RUNNING}running:${RESET} ${activeTool}`)
+  if (activeTool) items.push(`${WARNING}\u25b6${RESET} ${activeTool}`)
+  const running = backgroundTasks.filter(t => t.status === 'running')
+  if (running.length > 0) {
+    items.push(`${BRIGHT_CYAN}bg${RESET} ${running.length === 1 ? truncatePlain(running[0]!.command, 40) : `${running.length} shells`}`)
   }
-
-  const runningBackground = backgroundTasks.filter(task => task.status === 'running')
-  if (runningBackground.length > 0) {
-    const label =
-      runningBackground.length === 1
-        ? `1 shell: ${truncatePlain(runningBackground[0]!.command, 48)}`
-        : `${runningBackground.length} shells running`
-    items.push(`${BRIGHT_CYAN}background:${RESET} ${label}`)
+  if (recentTools.length === 0 && running.length === 0) {
+    items.push(`${DIM}no recent tools${RESET}`)
   }
-
-  if (recentTools.length === 0 && runningBackground.length === 0) {
-    items.push(`${DIM}recent: none${RESET}`)
-    return `${DIM}tools${RESET}  ${items.join('  ')}`
-  }
-
   for (const tool of recentTools.slice(-5).reverse()) {
-    const status = tool.status === 'success' ? `${STATUS_SUCCESS}ok${RESET}` : `${STATUS_ERROR}err${RESET}`
-    items.push(`${status} ${tool.name}`)
+    const s = tool.status === 'success' ? `${SUCCESS}\u2713${RESET}` : `${ERROR}\u2717${RESET}`
+    items.push(`${s} ${tool.name}`)
   }
-
-  return `${DIM}tools${RESET}  ${items.join('  ')}`
+  return items.join(` ${DIM}\u2022${RESET} `)
 }
 
 export function renderFooterBar(
   status: string | null,
   toolsEnabled: boolean,
   skillsEnabled: boolean,
-  mcpStatus: {
-    total: number
-    connected: number
-    connecting: number
-    error: number
-    toolCount: number
-  },
+  mcpStatus: { total: number; connected: number; connecting: number; error: number; toolCount: number },
   backgroundTasks: BackgroundTask[] = [],
   compressionStatus?: string | null,
 ): string {
   const width = Math.max(60, process.stdout.columns ?? 100)
-  const separator = `${DIM}│${RESET}`
-  const dot = `${DIM}•${RESET}`
+  const dot = `${DIM}\u2022${RESET}`
 
-  // 左侧：状态
+  // 左侧: 状态
   const left = renderStatusLine(status)
 
-  // 右侧：工具和MCP状态
-  const runningBackground = backgroundTasks.filter(task => task.status === 'running')
-  const backgroundSummary =
-    runningBackground.length > 0
-      ? `${separator} ${DIM}shells${RESET} ${BRIGHT_CYAN}${runningBackground.length}${RESET}`
-      : ''
-  const mcpSummary =
-    mcpStatus.total === 0
-      ? `${DIM}mcp${RESET} ${DIM}none${RESET}`
-      : mcpStatus.connecting > 0
-        ? `${DIM}mcp${RESET} ${STATUS_RUNNING}${mcpStatus.connected}/${mcpStatus.total}${RESET}`
-        : mcpStatus.error > 0
-          ? `${DIM}mcp${RESET} ${BRIGHT_RED}${mcpStatus.connected}/${mcpStatus.total}${RESET}`
-          : `${DIM}mcp${RESET} ${STATUS_SUCCESS}${mcpStatus.connected}/${mcpStatus.total}${RESET}`
-  const compressionPart = compressionStatus
-    ? `${separator} ${STATUS_WARNING}${compressionStatus}${RESET}`
-    : ''
-  const right = `${DIM}tools${RESET} ${toolsEnabled ? `${STATUS_SUCCESS}on${RESET}` : `${STATUS_ERROR}off${RESET}`} ${separator} ${DIM}skills${RESET} ${skillsEnabled ? `${STATUS_SUCCESS}on${RESET}` : `${STATUS_ERROR}off${RESET}`} ${separator} ${mcpSummary}${backgroundSummary}${compressionPart}`
+  // 右侧: 工具/技能/MCP
+  const parts: string[] = []
+  parts.push(`${DIM}tools${RESET} ${toolsEnabled ? `${SUCCESS}on${RESET}` : `${ERROR}off${RESET}`}`)
+  parts.push(`${DIM}skills${RESET} ${skillsEnabled ? `${SUCCESS}on${RESET}` : `${ERROR}off${RESET}`}`)
+  if (mcpStatus.total > 0) {
+    const mc = mcpStatus.error > 0 ? BRIGHT_RED : mcpStatus.connecting > 0 ? WARNING : SUCCESS
+    parts.push(`${DIM}mcp${RESET} ${mc}${mcpStatus.connected}/${mcpStatus.total}${RESET}`)
+  }
+  const bg = backgroundTasks.filter(t => t.status === 'running')
+  if (bg.length > 0) parts.push(`${DIM}shells${RESET} ${BRIGHT_CYAN}${bg.length}${RESET}`)
+  if (compressionStatus) parts.push(`${WARNING}${compressionStatus}${RESET}`)
 
-  // 使用点号分隔符连接左右两侧
+  const right = parts.join(` ${dot} `)
   const gap = Math.max(2, width - stringDisplayWidth(left) - stringDisplayWidth(right) - 4)
-  return `${left} ${dot}${' '.repeat(gap)}${dot} ${right}`
+  return `${DIM}\u2502${RESET} ${left}  ${' '.repeat(gap)}  ${right} ${DIM}\u2502${RESET}`
 }
 
 // ═══════════════════════════════════════════════════════════════
 // 斜杠命令菜单
 // ═══════════════════════════════════════════════════════════════
 
-export function renderSlashMenu(
-  commands: SlashCommand[],
-  selectedIndex: number,
-): string {
-  if (commands.length === 0) {
-    return `${DIM}no matching slash commands${RESET}`
-  }
+export function renderSlashMenu(commands: SlashCommand[], selectedIndex: number): string {
+  if (commands.length === 0) return `${DIM}no matching commands${RESET}`
 
   const categoryOrder = ['Session', 'Info', 'File Ops', 'Context', 'Dev']
   const groups = new Map<string, SlashCommand[]>()
@@ -547,35 +433,27 @@ export function renderSlashMenu(
   }
 
   const lines: string[] = []
-  let commandIndex = 0
-  const safeIndex = Math.min(selectedIndex, commands.length - 1)
+  let idx = 0
+  const safe = Math.min(selectedIndex, commands.length - 1)
 
   for (const cat of categoryOrder) {
     const cmds = groups.get(cat)
     if (!cmds || cmds.length === 0) continue
-
-    lines.push(`${DIM}── ${cat} ${'─'.repeat(Math.max(0, 30 - cat.length))}${RESET}`)
-
+    lines.push(`${BORDER_DIM}\u2500\u2500 ${DIM}${cat}${RESET}`)
     for (const cmd of cmds) {
       const usage = padPlain(cmd.usage, 24)
-      const prefix =
-        commandIndex === safeIndex
-          ? `${REVERSE} ${usage} ${RESET}`
-          : ` ${usage} `
-      lines.push(`${prefix} ${DIM}${truncatePlain(cmd.description, 60)}${RESET}`)
-      commandIndex++
+      const prefix = idx === safe ? `${REVERSE} ${usage} ${RESET}` : ` ${usage} `
+      lines.push(`${prefix} ${DIM}${truncatePlain(cmd.description, 50)}${RESET}`)
+      idx++
     }
   }
 
   for (const cmd of commands) {
     if (!categoryOrder.includes(cmd.category)) {
       const usage = padPlain(cmd.usage, 24)
-      const prefix =
-        commandIndex === safeIndex
-          ? `${REVERSE} ${usage} ${RESET}`
-          : ` ${usage} `
-      lines.push(`${prefix} ${DIM}${truncatePlain(cmd.description, 60)}${RESET}`)
-      commandIndex++
+      const prefix = idx === safe ? `${REVERSE} ${usage} ${RESET}` : ` ${usage} `
+      lines.push(`${prefix} ${DIM}${truncatePlain(cmd.description, 50)}${RESET}`)
+      idx++
     }
   }
 
@@ -587,130 +465,67 @@ export function renderSlashMenu(
 // ═══════════════════════════════════════════════════════════════
 
 type PermissionPromptRenderOptions = {
-  expanded?: boolean
-  scrollOffset?: number
-  selectedChoiceIndex?: number
-  feedbackMode?: boolean
-  feedbackInput?: string
+  expanded?: boolean; scrollOffset?: number; selectedChoiceIndex?: number
+  feedbackMode?: boolean; feedbackInput?: string
 }
 
 function flattenDetailLines(details: string[]): string[] {
   const lines: string[] = []
-  details.forEach((detail, index) => {
-    if (index > 0) {
-      lines.push('')
-    }
-    lines.push(...detail.split('\n'))
-  })
+  details.forEach((d, i) => { if (i > 0) lines.push(''); lines.push(...d.split('\n')) })
   return lines
 }
 
-function sliceVisibleDetails(
-  detailLines: string[],
-  expanded: boolean,
-  scrollOffset: number,
-): { lines: string[]; maxScroll: number; hiddenCount: number } {
+function sliceVisibleDetails(detailLines: string[], expanded: boolean, scrollOffset: number) {
   if (!expanded) {
-    const collapsedLimit = 16
-    if (detailLines.length <= collapsedLimit) {
-      return { lines: detailLines, maxScroll: 0, hiddenCount: 0 }
-    }
-    return {
-      lines: detailLines.slice(0, collapsedLimit),
-      maxScroll: 0,
-      hiddenCount: detailLines.length - collapsedLimit,
-    }
-  }
-
-  const rows = process.stdout.rows ?? 40
-  const expandedWindow = Math.max(8, rows - 20)
-  const maxScroll = Math.max(0, detailLines.length - expandedWindow)
-  const offset = Math.max(0, Math.min(scrollOffset, maxScroll))
-  const start = offset
-  const end = Math.min(detailLines.length, start + expandedWindow)
-  return {
-    lines: detailLines.slice(start, end),
-    maxScroll,
-    hiddenCount: 0,
-  }
-}
-
-export function getPermissionPromptMaxScrollOffset(
-  request: PermissionRequest,
-  options: PermissionPromptRenderOptions = {},
-): number {
-  const details =
-    request.kind === 'edit'
-      ? colorizeEditPermissionDetails(request.details)
-      : request.details
-  const detailLines = flattenDetailLines(details)
-  const expanded = options.expanded ?? false
-  if (!expanded) {
-    return 0
+    const limit = 16
+    if (detailLines.length <= limit) return { lines: detailLines, maxScroll: 0, hiddenCount: 0 }
+    return { lines: detailLines.slice(0, limit), maxScroll: 0, hiddenCount: detailLines.length - limit }
   }
   const rows = process.stdout.rows ?? 40
-  const expandedWindow = Math.max(8, rows - 20)
-  return Math.max(0, detailLines.length - expandedWindow)
+  const win = Math.max(8, rows - 20)
+  const maxScroll = Math.max(0, detailLines.length - win)
+  const off = Math.max(0, Math.min(scrollOffset, maxScroll))
+  return { lines: detailLines.slice(off, off + win), maxScroll, hiddenCount: 0 }
 }
 
-export function renderPermissionPrompt(
-  request: PermissionRequest,
-  options: PermissionPromptRenderOptions = {},
-): string {
-  const details =
-    request.kind === 'edit'
-      ? colorizeEditPermissionDetails(request.details)
-      : request.details
+export function getPermissionPromptMaxScrollOffset(request: PermissionRequest, options: PermissionPromptRenderOptions = {}): number {
+  const details = request.kind === 'edit' ? colorizeEditPermissionDetails(request.details) : request.details
+  const dl = flattenDetailLines(details)
+  if (!(options.expanded ?? false)) return 0
+  const rows = process.stdout.rows ?? 40
+  return Math.max(0, dl.length - Math.max(8, rows - 20))
+}
+
+export function renderPermissionPrompt(request: PermissionRequest, options: PermissionPromptRenderOptions = {}): string {
+  const details = request.kind === 'edit' ? colorizeEditPermissionDetails(request.details) : request.details
   const expanded = options.expanded ?? false
   const scrollOffset = options.scrollOffset ?? 0
   const selectedChoiceIndex = options.selectedChoiceIndex ?? 0
   const feedbackMode = options.feedbackMode ?? false
   const feedbackInput = options.feedbackInput ?? ''
-  const detailLines = flattenDetailLines(details)
-  const {
-    lines: visibleDetailLines,
-    maxScroll,
-    hiddenCount,
-  } = sliceVisibleDetails(detailLines, expanded, scrollOffset)
+  const dl = flattenDetailLines(details)
+  const { lines: vis, maxScroll, hiddenCount } = sliceVisibleDetails(dl, expanded, scrollOffset)
 
   const promptLines = [
-    `${STATUS_WARNING}${BOLD}Approval Required${RESET}`,
+    `${WARNING}${BOLD}\u26a0 Approval Required${RESET}`,
     `${BOLD}${request.summary}${RESET}`,
-    ...visibleDetailLines,
+    ...vis,
   ]
 
   if (request.kind === 'edit') {
     if (!expanded && hiddenCount > 0) {
-      promptLines.push(
-        `${DIM}... ${hiddenCount} more line(s) hidden${RESET}`,
-        `${DIM}Ctrl+O expand full diff${RESET}`,
-      )
+      promptLines.push(`${DIM}... ${hiddenCount} more lines hidden | Ctrl+O expand${RESET}`)
     } else if (expanded) {
-      promptLines.push(
-        `${DIM}Ctrl+O collapse | Wheel/PgUp/PgDn/Alt+Up/Alt+Down scroll (${Math.max(
-          0,
-          Math.min(scrollOffset, maxScroll),
-        )}/${maxScroll})${RESET}`,
-      )
+      promptLines.push(`${DIM}Ctrl+O collapse | scroll (${Math.max(0, Math.min(scrollOffset, maxScroll))}/${maxScroll})${RESET}`)
     }
   }
 
   return [
-    ...promptLines,
-    '',
+    ...promptLines, '',
     ...(feedbackMode
-      ? [
-          `${STATUS_WARNING}${BOLD}Reject With Guidance${RESET}`,
-          `${DIM}Type feedback for model, Enter submit, Esc back${RESET}`,
-          `> ${feedbackInput}`,
-        ]
-      : request.choices.map((choice, index) => {
-          const selected = index === selectedChoiceIndex
-          const prefix = selected ? `${REVERSE}>${RESET}` : ' '
-          return `${prefix} ${choice.label}`
-        })),
-    '',
-    `${DIM}Use Up/Down to select, Enter confirm, Esc deny once${RESET}`,
+      ? [`${WARNING}${BOLD}Reject With Guidance${RESET}`, `${DIM}Type feedback, Enter submit, Esc back${RESET}`, `> ${feedbackInput}`]
+      : request.choices.map((c, i) => `${i === selectedChoiceIndex ? `${REVERSE}>${RESET}` : ' '} ${c.label}`)),
+    '', `${DIM}\u2191/\u2193 select \u2022 Enter confirm \u2022 Esc deny${RESET}`,
   ].join('\n')
 }
 
@@ -719,189 +534,72 @@ export function renderPermissionPrompt(
 // ═══════════════════════════════════════════════════════════════
 
 type DiffLineKind = 'meta' | 'add' | 'remove' | 'context'
-
-type StyledDiffLine = {
-  raw: string
-  kind: DiffLineKind
-  emphasisRange?: { start: number; end: number }
-}
+type StyledDiffLine = { raw: string; kind: DiffLineKind; emphasisRange?: { start: number; end: number } }
 
 function isUnifiedDiffHeader(line: string): boolean {
-  return (
-    line.startsWith('--- ') ||
-    line.startsWith('+++ ') ||
-    line.startsWith('@@ ')
-  )
+  return line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('@@ ')
 }
 
 function classifyDiffLine(line: string): DiffLineKind {
-  if (isUnifiedDiffHeader(line)) {
-    return 'meta'
-  }
-
-  if (line.startsWith('+')) {
-    return 'add'
-  }
-
-  if (line.startsWith('-')) {
-    return 'remove'
-  }
-
+  if (isUnifiedDiffHeader(line)) return 'meta'
+  if (line.startsWith('+')) return 'add'
+  if (line.startsWith('-')) return 'remove'
   return 'context'
 }
 
-function computeChangedRange(
-  removedText: string,
-  addedText: string,
-): { remove: { start: number; end: number }; add: { start: number; end: number } } | null {
-  if (!removedText || !addedText) {
-    return null
-  }
-
+function computeChangedRange(removed: string, added: string) {
+  if (!removed || !added) return null
   let prefix = 0
-  const maxPrefix = Math.min(removedText.length, addedText.length)
-  while (
-    prefix < maxPrefix &&
-    removedText[prefix] === addedText[prefix]
-  ) {
-    prefix += 1
-  }
-
-  let removedSuffix = removedText.length - 1
-  let addedSuffix = addedText.length - 1
-  while (
-    removedSuffix >= prefix &&
-    addedSuffix >= prefix &&
-    removedText[removedSuffix] === addedText[addedSuffix]
-  ) {
-    removedSuffix -= 1
-    addedSuffix -= 1
-  }
-
-  const removeRange = { start: prefix, end: removedSuffix + 1 }
-  const addRange = { start: prefix, end: addedSuffix + 1 }
-  if (removeRange.start >= removeRange.end || addRange.start >= addRange.end) {
-    return null
-  }
-
-  return {
-    remove: removeRange,
-    add: addRange,
-  }
+  const maxP = Math.min(removed.length, added.length)
+  while (prefix < maxP && removed[prefix] === added[prefix]) prefix++
+  let rs = removed.length - 1, as = added.length - 1
+  while (rs >= prefix && as >= prefix && removed[rs] === added[as]) { rs--; as-- }
+  const rr = { start: prefix, end: rs + 1 }, ar = { start: prefix, end: as + 1 }
+  if (rr.start >= rr.end || ar.start >= ar.end) return null
+  return { remove: rr, add: ar }
 }
 
-function applyWordEmphasis(
-  content: string,
-  color: string,
-  emphasisRange?: { start: number; end: number },
-): string {
-  if (!emphasisRange) {
-    return `${color}${content}${RESET}`
-  }
-
-  const start = Math.max(0, Math.min(content.length, emphasisRange.start))
-  const end = Math.max(start, Math.min(content.length, emphasisRange.end))
-  if (start === end) {
-    return `${color}${content}${RESET}`
-  }
-
-  const before = content.slice(0, start)
-  const changed = content.slice(start, end)
-  const after = content.slice(end)
-  return [
-    `${color}${before}`,
-    `${BOLD}${changed}${RESET}`,
-    `${color}${after}${RESET}`,
-  ].join('')
+function applyWordEmphasis(content: string, color: string, range?: { start: number; end: number }): string {
+  if (!range) return `${color}${content}${RESET}`
+  const s = Math.max(0, Math.min(content.length, range.start))
+  const e = Math.max(s, Math.min(content.length, range.end))
+  if (s === e) return `${color}${content}${RESET}`
+  return `${color}${content.slice(0, s)}${BOLD}${content.slice(s, e)}${RESET}${color}${content.slice(e)}${RESET}`
 }
 
 function renderStyledDiffLine(line: StyledDiffLine): string {
-  if (line.raw.trim() === '') {
-    return line.raw
-  }
-
-  if (line.kind === 'meta') {
-    return `${CYAN}${BOLD}${line.raw}${RESET}`
-  }
-
+  if (line.raw.trim() === '') return line.raw
+  if (line.kind === 'meta') return `${CYAN}${BOLD}${line.raw}${RESET}`
   if (line.kind === 'add' || line.kind === 'remove') {
-    const sign = line.raw.slice(0, 1)
-    const content = line.raw.slice(1)
+    const sign = line.raw[0], content = line.raw.slice(1)
     const color = line.kind === 'add' ? BRIGHT_GREEN : BRIGHT_RED
-    const emphasized = applyWordEmphasis(content, color, line.emphasisRange)
-    return `${color}${sign}${RESET}${emphasized}`
+    return `${color}${sign}${RESET}${applyWordEmphasis(content, color, line.emphasisRange)}`
   }
-
-  if (line.raw.startsWith('... (')) {
-    return `${DIM}${line.raw}${RESET}`
-  }
-
   return `${DIM}${line.raw}${RESET}`
 }
 
 function colorizeUnifiedDiffBlock(block: string): string {
   const lines = block.split('\n')
-  const styled: StyledDiffLine[] = lines.map(raw => ({
-    raw,
-    kind: classifyDiffLine(raw),
-  }))
-
-  for (let i = 0; i < styled.length; i += 1) {
-    if (styled[i]?.kind !== 'remove') {
-      continue
+  const styled: StyledDiffLine[] = lines.map(raw => ({ raw, kind: classifyDiffLine(raw) }))
+  for (let i = 0; i < styled.length; i++) {
+    if (styled[i]!.kind !== 'remove') continue
+    let re = i; while (re < styled.length && styled[re]!.kind === 'remove') re++
+    let ae = re; while (ae < styled.length && styled[ae]!.kind === 'add') ae++
+    const pair = Math.min(re - i, ae - re)
+    for (let p = 0; p < pair; p++) {
+      const rl = styled[i + p]!, al = styled[re + p]!
+      const ranges = computeChangedRange(rl.raw.slice(1), al.raw.slice(1))
+      if (ranges) { rl.emphasisRange = ranges.remove; al.emphasisRange = ranges.add }
     }
-
-    let removeEnd = i
-    while (removeEnd < styled.length && styled[removeEnd]?.kind === 'remove') {
-      removeEnd += 1
-    }
-
-    let addEnd = removeEnd
-    while (addEnd < styled.length && styled[addEnd]?.kind === 'add') {
-      addEnd += 1
-    }
-
-    const removeCount = removeEnd - i
-    const addCount = addEnd - removeEnd
-    const pairCount = Math.min(removeCount, addCount)
-    for (let pairIndex = 0; pairIndex < pairCount; pairIndex += 1) {
-      const removeLine = styled[i + pairIndex]
-      const addLine = styled[removeEnd + pairIndex]
-      if (!removeLine || !addLine) {
-        continue
-      }
-
-      const removedText = removeLine.raw.slice(1)
-      const addedText = addLine.raw.slice(1)
-      const ranges = computeChangedRange(removedText, addedText)
-      if (!ranges) {
-        continue
-      }
-
-      removeLine.emphasisRange = ranges.remove
-      addLine.emphasisRange = ranges.add
-    }
-
-    i = addEnd - 1
+    i = ae - 1
   }
-
   return styled.map(renderStyledDiffLine).join('\n')
 }
 
 function looksLikeDiffBlock(detail: string): boolean {
-  return (
-    detail.includes('\n') &&
-    (detail.includes('--- a/') ||
-      detail.includes('+++ b/') ||
-      detail.includes('@@ '))
-  )
+  return detail.includes('\n') && (detail.includes('--- a/') || detail.includes('+++ b/') || detail.includes('@@ '))
 }
 
 function colorizeEditPermissionDetails(details: string[]): string[] {
-  return details.map(detail => {
-    if (looksLikeDiffBlock(detail)) {
-      return colorizeUnifiedDiffBlock(detail)
-    }
-    return detail
-  })
+  return details.map(d => looksLikeDiffBlock(d) ? colorizeUnifiedDiffBlock(d) : d)
 }

@@ -1,6 +1,6 @@
 import {
   RESET, DIM, BOLD, REVERSE,
-  STATUS_SUCCESS, STATUS_WARNING,
+  SUCCESS, WARNING,
 } from './colors.js'
 
 export function renderInputPrompt(input: string, cursorOffset: number): string {
@@ -9,8 +9,8 @@ export function renderInputPrompt(input: string, cursorOffset: number): string {
   const current = input[offset] ?? ' '
   const after = input.slice(Math.min(offset + 1, input.length))
   return [
-    `${STATUS_WARNING}${BOLD}prompt${RESET} ${DIM}Enter send | /help commands | Esc clear | Ctrl+C exit${RESET}`,
+    `${WARNING}${BOLD}prompt${RESET} ${DIM}Enter send | /help commands | Esc clear | Ctrl+C exit${RESET}`,
     '',
-    `${STATUS_SUCCESS}${BOLD}powercode>${RESET} ${before}${REVERSE}${current}${RESET}${after}${DIM}${input ? '' : ' Ask for code, files, tasks, or MCP tools'}${RESET}`,
+    `${SUCCESS}${BOLD}>${RESET} ${before}${REVERSE}${current}${RESET}${after}${DIM}${input ? '' : ' Ask for code, files, tasks, or MCP tools'}${RESET}`,
   ].join('\n')
 }
