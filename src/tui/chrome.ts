@@ -149,31 +149,51 @@ function joinSegmentsWithinWidth(
 
 /** 圆角边框字符集 */
 const BORDER_CHARS = {
-  topLeft: '╭',
-  topRight: '╮',
-  bottomLeft: '╰',
-  bottomRight: '╯',
-  horizontal: '─',
-  vertical: '│',
+  // 单线边框
+  single: {
+    topLeft: '╭',
+    topRight: '╮',
+    bottomLeft: '╰',
+    bottomRight: '╯',
+    horizontal: '─',
+    vertical: '│',
+  },
+  // 双线边框（用于强调）
+  double: {
+    topLeft: '╔',
+    topRight: '╗',
+    bottomLeft: '╚',
+    bottomRight: '╝',
+    horizontal: '═',
+    vertical: '║',
+  },
+  // T型连接符
+  tee: {
+    left: '├',
+    right: '┤',
+    down: '┬',
+    up: '┴',
+    cross: '┼',
+  },
 } as const
 
 /** 创建顶部边框线 */
 function _borderLineTop(width: number): string {
   const inner = Math.max(0, width - 2)
-  return `${BORDER}${BORDER_CHARS.topLeft}${BORDER_CHARS.horizontal.repeat(inner)}${BORDER_CHARS.topRight}${RESET}`
+  return `${BORDER}${BORDER_CHARS.single.topLeft}${BORDER_CHARS.single.horizontal.repeat(inner)}${BORDER_CHARS.single.topRight}${RESET}`
 }
 
 /** 创建底部边框线 */
 function borderLineBottom(width: number): string {
   const inner = Math.max(0, width - 2)
-  return `${BORDER}${BORDER_CHARS.bottomLeft}${BORDER_CHARS.horizontal.repeat(inner)}${BORDER_CHARS.bottomRight}${RESET}`
+  return `${BORDER}${BORDER_CHARS.single.bottomLeft}${BORDER_CHARS.single.horizontal.repeat(inner)}${BORDER_CHARS.single.bottomRight}${RESET}`
 }
 
-/** 创建带标题的顶部边框线 */
+/** 创建带标题的顶部边框线 - 使用双线边框强调标题 */
 function borderLineTopWithTitle(width: number, title: string, rightTitle?: string): string {
   const inner = Math.max(0, width - 2)
-  const titleStr = ` ${BOLD}${title}${RESET}${BORDER} `
-  const titleWidth = stringDisplayWidth(title) + 2
+  const titleStr = ` ${BOLD}${ACCENT_PRIMARY}${title}${RESET}${BORDER} `
+  const titleWidth = stringDisplayWidth(title) + 4
 
   let rightStr = ''
   let rightWidth = 0
@@ -184,9 +204,9 @@ function borderLineTopWithTitle(width: number, title: string, rightTitle?: strin
   }
 
   const dashCount = Math.max(0, inner - titleWidth - rightWidth)
-  const dashes = BORDER_CHARS.horizontal.repeat(dashCount)
+  const dashes = BORDER_CHARS.single.horizontal.repeat(dashCount)
 
-  return `${BORDER}${BORDER_CHARS.topLeft}${titleStr}${dashes}${rightStr}${BORDER_CHARS.topRight}${RESET}`
+  return `${BORDER}${BORDER_CHARS.single.topLeft}${BORDER_CHARS.single.horizontal}${titleStr}${dashes}${rightStr}${BORDER_CHARS.single.topRight}${RESET}`
 }
 
 /** 创建面板行 */
@@ -194,12 +214,12 @@ function panelRow(content: string, width: number): string {
   const inner = Math.max(0, width - 4)
   const contentWidth = stringDisplayWidth(content)
   const padding = Math.max(0, inner - contentWidth)
-  return `${BORDER}${BORDER_CHARS.vertical}${RESET} ${content}${' '.repeat(padding)} ${BORDER}${BORDER_CHARS.vertical}${RESET}`
+  return `${BORDER}${BORDER_CHARS.single.vertical}${RESET} ${content}${' '.repeat(padding)} ${BORDER}${BORDER_CHARS.single.vertical}${RESET}`
 }
 
 /** 创建空面板行 */
 function emptyPanelRow(width: number): string {
-  return `${BORDER}${BORDER_CHARS.vertical}${RESET}${' '.repeat(Math.max(0, width - 2))}${BORDER}${BORDER_CHARS.vertical}${RESET}`
+  return `${BORDER}${BORDER_CHARS.single.vertical}${RESET}${' '.repeat(Math.max(0, width - 2))}${BORDER}${BORDER_CHARS.single.vertical}${RESET}`
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -476,26 +496,34 @@ export function renderFooterBar(
   compressionStatus?: string | null,
 ): string {
   const width = Math.max(60, process.stdout.columns ?? 100)
+  const separator = `${DIM}│${RESET}`
+  const dot = `${DIM}•${RESET}`
+
+  // 左侧：状态
   const left = renderStatusLine(status)
+
+  // 右侧：工具和MCP状态
   const runningBackground = backgroundTasks.filter(task => task.status === 'running')
   const backgroundSummary =
     runningBackground.length > 0
-      ? `${DIM}│${RESET} ${DIM}shells${RESET} ${BRIGHT_CYAN}${runningBackground.length}${RESET}`
+      ? `${separator} ${DIM}shells${RESET} ${BRIGHT_CYAN}${runningBackground.length}${RESET}`
       : ''
   const mcpSummary =
     mcpStatus.total === 0
       ? `${DIM}mcp${RESET} ${DIM}none${RESET}`
       : mcpStatus.connecting > 0
-        ? `${DIM}mcp srv${RESET} ${STATUS_RUNNING}${mcpStatus.connected}/${mcpStatus.total} ready, ${mcpStatus.connecting} connecting${mcpStatus.toolCount > 0 ? `, ${mcpStatus.toolCount} tools` : ''}${RESET}`
+        ? `${DIM}mcp${RESET} ${STATUS_RUNNING}${mcpStatus.connected}/${mcpStatus.total}${RESET}`
         : mcpStatus.error > 0
-          ? `${DIM}mcp srv${RESET} ${BRIGHT_RED}${mcpStatus.connected}/${mcpStatus.total} ready, ${mcpStatus.error} err${mcpStatus.toolCount > 0 ? `, ${mcpStatus.toolCount} tools` : ''}${RESET}`
-          : `${DIM}mcp srv${RESET} ${STATUS_SUCCESS}${mcpStatus.connected}/${mcpStatus.total} ready${mcpStatus.toolCount > 0 ? `, ${mcpStatus.toolCount} tools` : ''}${RESET}`
+          ? `${DIM}mcp${RESET} ${BRIGHT_RED}${mcpStatus.connected}/${mcpStatus.total}${RESET}`
+          : `${DIM}mcp${RESET} ${STATUS_SUCCESS}${mcpStatus.connected}/${mcpStatus.total}${RESET}`
   const compressionPart = compressionStatus
-    ? `${DIM}│${RESET} ${STATUS_WARNING}${compressionStatus}${RESET}`
+    ? `${separator} ${STATUS_WARNING}${compressionStatus}${RESET}`
     : ''
-  const right = `${DIM}tools${RESET} ${toolsEnabled ? `${STATUS_SUCCESS}on${RESET}` : `${STATUS_ERROR}off${RESET}`} ${DIM}│${RESET} ${DIM}skills${RESET} ${skillsEnabled ? `${STATUS_SUCCESS}on${RESET}` : `${STATUS_ERROR}off${RESET}`} ${DIM}│${RESET} ${mcpSummary}${backgroundSummary}${compressionPart}`
-  const gap = Math.max(1, width - stringDisplayWidth(left) - stringDisplayWidth(right))
-  return `${left}${' '.repeat(gap)}${right}`
+  const right = `${DIM}tools${RESET} ${toolsEnabled ? `${STATUS_SUCCESS}on${RESET}` : `${STATUS_ERROR}off${RESET}`} ${separator} ${DIM}skills${RESET} ${skillsEnabled ? `${STATUS_SUCCESS}on${RESET}` : `${STATUS_ERROR}off${RESET}`} ${separator} ${mcpSummary}${backgroundSummary}${compressionPart}`
+
+  // 使用点号分隔符连接左右两侧
+  const gap = Math.max(2, width - stringDisplayWidth(left) - stringDisplayWidth(right) - 4)
+  return `${left} ${dot}${' '.repeat(gap)}${dot} ${right}`
 }
 
 // ═══════════════════════════════════════════════════════════════
