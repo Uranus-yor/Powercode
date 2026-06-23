@@ -691,52 +691,64 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
 
   // Working state: full-width
   const leftPad = 0
+  const rows = Math.max(24, process.stdout.rows ?? 40)
 
-  parts.push(
-    renderTranscript(
-      state.transcript,
-      state.transcriptScrollOffset,
-      getTranscriptBodyLines(args, state),
-      state.selection ?? undefined,
-      terminalWidth,
-    ),
-    '',
-    renderInputPanel(
-      terminalWidth,
-      leftPad,
-      args.runtime?.model ?? 'not-configured',
-      state.contextStats ? Math.round(state.contextStats.utilization * 100) : undefined,
-      state.input,
-      state.cursorOffset,
-    ),
+  // 渲染 transcript 内容
+  const transcriptContent = renderTranscript(
+    state.transcript,
+    state.transcriptScrollOffset,
+    getTranscriptBodyLines(args, state),
+    state.selection ?? undefined,
+    terminalWidth,
   )
+  const transcriptLines = transcriptContent.split('\n').length
 
-  // 运行动画提示（在输入框下方）
+  // 渲染输入面板
+  const inputPanel = renderInputPanel(
+    terminalWidth,
+    leftPad,
+    args.runtime?.model ?? 'not-configured',
+    state.contextStats ? Math.round(state.contextStats.utilization * 100) : undefined,
+    state.input,
+    state.cursorOffset,
+  )
+  const inputPanelLines = inputPanel.split('\n').length
+
+  // 运行动画提示
+  let busyLine = ''
+  let busyLines = 0
   if (state.isBusy) {
     const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
     const frame = spinnerFrames[Math.floor(Date.now() / 100) % spinnerFrames.length]
     const toolInfo = state.activeTool ? ` ${DIM}\u00b7${RESET} ${state.activeTool}` : ''
-    parts.push(`  ${WARNING}${frame}${RESET} ${state.status ?? 'working'}${toolInfo}`)
+    busyLine = `  ${WARNING}${frame}${RESET} ${state.status ?? 'working'}${toolInfo}`
+    busyLines = 1
   }
 
-  // 斜杠菜单（在 flushFrame 之前，不加入 parts，单独计算行数）
+  // 斜杠菜单
   const commands = getVisibleCommands(state.input)
-  let menuLineCount = 0
+  let menuContent = ''
+  let menuLines = 0
   if (commands.length > 0) {
-    const menuStr = renderSlashMenu(
+    menuContent = renderSlashMenu(
       commands,
       Math.min(state.selectedSlashIndex, commands.length - 1),
     )
-    menuLineCount = menuStr.split('\n').length
-    parts.push(menuStr)
+    menuLines = menuContent.split('\n').length
   }
 
-  // 计算光标位置
-  // parts 结构: [transcript, '', inputPanel, menu?]
-  // 输入面板之前有 transcript(0) + ''(1) 两个元素
-  // 输入面板内：border(0) + input(1) + empty(2) + brand(3) + border(4)
-  const linesBeforeInputPanel = (parts[0] ?? '').split('\n').length + 1  // transcript + ''
-  const inputRow = linesBeforeInputPanel + 2  // +2: 跳过 border 到 input 行（1-indexed）
+  // 计算需要填充的空行，把输入框推到底部
+  const usedLines = transcriptLines + 1 + inputPanelLines + busyLines + menuLines
+  const paddingLines = Math.max(0, rows - usedLines)
+
+  parts.push(transcriptContent)
+  for (let i = 0; i < paddingLines; i++) parts.push('')
+  parts.push(inputPanel)
+  if (busyLine) parts.push(busyLine)
+  if (menuContent) parts.push(menuContent)
+
+  // 计算光标位置（输入框固定在底部）
+  const inputRow = rows - inputPanelLines + 2 - busyLines - menuLines  // 输入行在输入面板中的位置
   const inputText = state.input ?? ''
   const beforeCursor = inputText.slice(0, Math.min(state.cursorOffset, inputText.length))
   const cursorCol = leftPad + 4 + stringDisplayWidth(beforeCursor)
