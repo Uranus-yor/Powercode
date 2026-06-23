@@ -573,7 +573,7 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
   const backgroundTasks = listBackgroundTasks()
   const parts: string[] = []
 
-  state.transcriptBodyStartY = 4  // panel: border(1) + title(1) + empty(1) + body starts here
+  state.transcriptBodyStartY = 1  // 顶部 padding(1) 行
   state.transcriptBodyLines = getTranscriptBodyLines(args, state)
 
   if (state.pendingApproval) {
@@ -2237,7 +2237,8 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
             }
             return
           }
-          const col = Math.max(0, screenX - 3)
+          // 列偏移：PAD(2) + 色条(2) = 4 字符偏移
+          const col = Math.max(0, screenX - 4)
 
           if (event.action === 'press' && event.button === 'left') {
             state.mouseDown = { x: col, y: lineIndex }

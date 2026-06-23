@@ -121,9 +121,9 @@ export function renderMarkdownish(input: string): string {
       continue
     }
     if (/^\|.*\|$/.test(line.trim())) {
-      // 表格内容行
+      // 表格内容行 - 对每个单元格应用行内格式
       const cells = line.split('|').map(c => c.trim()).filter(Boolean)
-      result.push(cells.join(` ${DIM}│${RESET} `))
+      result.push(cells.map(c => renderInline(c)).join(` ${DIM}│${RESET} `))
       continue
     }
 
