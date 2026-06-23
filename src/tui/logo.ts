@@ -65,7 +65,7 @@ export function renderInputPanel(
   const rightInfo = [model, ctx].filter(Boolean).join(` ${DIM}\u2022${RESET} `)
   const rightW = stringDisplayWidth(rightInfo) + 2
 
-  const dashN = Math.max(1, inner - titleW - rightW)
+  const dashN = Math.max(1, inner - 1 - titleW - rightW)
   result.push(`${pad}${BORDER_DIM}${B.tl}${B.h}${RESET}${titlePart}${BORDER_DIM}${B.h.repeat(dashN)} ${rightInfo} ${B.tr}${RESET}`)
 
   // 输入行
@@ -102,7 +102,7 @@ export function renderInputPanel(
   }
 
   const inputContent = `${SUCCESS}${BOLD}>${RESET} ${before}${cursor}${after}`
-  result.push(`${pad}${BORDER_DIM}${B.v}${RESET} ${inputContent}${' '.repeat(Math.max(0, inner - 2 - stringDisplayWidth(inputContent) - 1))}${BORDER_DIM}${B.v}${RESET}`)
+  result.push(`${pad}${BORDER_DIM}${B.v}${RESET} ${inputContent}${' '.repeat(Math.max(0, inner - 1 - stringDisplayWidth(inputContent) - 1))}${BORDER_DIM}${B.v}${RESET}`)
 
   // 底部边框
   result.push(`${pad}${BORDER_DIM}${B.bl}${B.h.repeat(inner)}${B.br}${RESET}`)

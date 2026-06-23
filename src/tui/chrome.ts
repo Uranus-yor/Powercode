@@ -141,7 +141,7 @@ export function renderCard(
     rightPart = ` ${DIM}${rt}${RESET}${BORDER_DIM} `
     rightW = stringDisplayWidth(rt) + 2
   }
-  const dashN = Math.max(1, inner - titleW - rightW)
+  const dashN = Math.max(1, inner - 1 - titleW - rightW)
   result.push(`${BORDER_DIM}${B.tl}${B.h}${RESET}${titlePart}${BORDER_DIM}${B.h.repeat(dashN)}${RESET}${rightPart}${BORDER_DIM}${B.tr}${RESET}`)
 
   // 内容行: │ content │
@@ -197,7 +197,7 @@ function emptyRow(width: number): string {
 function contentRow(content: string, width: number): string {
   const inner = width - 2
   const w = stringDisplayWidth(content)
-  const pad = Math.max(0, inner - w)
+  const pad = Math.max(0, inner - 1 - w)
   return `${BORDER_DIM}${B.v}${RESET} ${content}${' '.repeat(pad)}${BORDER_DIM}${B.v}${RESET}`
 }
 
@@ -263,7 +263,7 @@ export function renderPanel(
     rightPart = ` ${DIM}${rt}${RESET}${BORDER_DIM} `
     rightW = stringDisplayWidth(rt) + 2
   }
-  const dashN = Math.max(1, inner - titleW - rightW)
+  const dashN = Math.max(1, inner - 1 - titleW - rightW)
   result.push(`${BORDER_DIM}${B.tl}${B.h}${RESET}${titlePart}${BORDER_DIM}${B.h.repeat(dashN)}${RESET}${rightPart}${BORDER_DIM}${B.tr}${RESET}`)
 
   result.push(emptyRow(width))
