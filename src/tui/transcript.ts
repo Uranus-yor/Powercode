@@ -6,7 +6,7 @@ import {
   RESET, DIM, BOLD, REVERSE,
   FG_MUTED,
   STATUS_SUCCESS, STATUS_ERROR, STATUS_RUNNING,
-  ACCENT_PRIMARY, ACCENT_SECONDARY,
+  ACCENT_PRIMARY,
   CYAN,
   BG_USER, FG_DARK,
 } from './colors.js'
@@ -147,17 +147,15 @@ function previewToolBody(toolName: string, body: string): string {
   }
 
   if (limited !== body) {
-    return `${limited}\n${DIM}... output truncated in transcript${RESET}`
+    return `${limited}\n${DIM}... output truncated${RESET}`
   }
 
   return limited
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 边框字符常量
+// 边框字符常量 - 按照 tui-design skill 设计
 // ═══════════════════════════════════════════════════════════════
-
-const BOX_INNER_WIDTH = 54
 
 const BOX = {
   topLeft: '╭',
@@ -166,26 +164,76 @@ const BOX = {
   bottomRight: '╯',
   horizontal: '─',
   vertical: '│',
+  // T型连接符
+  teeLeft: '├',
+  teeRight: '┤',
 } as const
 
 // ═══════════════════════════════════════════════════════════════
-// 多Agent面板渲染
+// 通用卡片渲染器 - 按照 tui-design skill 的 Persistent Multi-Panel 设计
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * 渲染一个完整的卡片框
+ * @param title 标题
+ * @param contentLines 内容行数组
+ * @param totalWidth 总宽度（包括边框）
+ * @param statusIcon 可选的状态图标
+ * @param durationStr 可选的耗时字符串
+ */
+function renderCard(
+  title: string,
+  contentLines: string[],
+  totalWidth: number,
+  statusIcon?: string,
+  durationStr?: string,
+): string {
+  const innerWidth = totalWidth - 2 // 减去左右边框
+
+  // 构建顶部边框: ╭─ title ────── statusIcon durationStr ─╮
+  let topBorder = `${DIM}${BOX.topLeft}${BOX.horizontal} ${BOLD}${title}${RESET}${DIM} `
+
+  // 计算右侧部分
+  const rightPart = statusIcon ? `${statusIcon}${durationStr ?? ''} ` : ''
+  const rightWidth = statusIcon ? displayWidth(statusIcon) + displayWidth(durationStr ?? '') + 1 : 0
+
+  // 计算中间横线数量
+  const titleWidth = displayWidth(title) + 4 // "╭─ title "
+  const usedWidth = titleWidth + rightWidth
+  const dashCount = Math.max(1, innerWidth - usedWidth)
+
+  topBorder += `${BOX.horizontal.repeat(dashCount)} ${rightPart}${BOX.topRight}${RESET}`
+
+  // 构建内容行: │ content │
+  const contentRows = contentLines.map(line => {
+    const lineW = displayWidth(line)
+    const maxContentWidth = innerWidth - 2 // 减去两侧 │ 和空格
+    let displayLine = line
+    if (lineW > maxContentWidth) {
+      displayLine = truncateByWidth(line, maxContentWidth)
+    }
+    const pad = Math.max(0, innerWidth - 2 - displayWidth(displayLine))
+    return `${DIM}${BOX.vertical}${RESET} ${displayLine}${' '.repeat(pad)} ${DIM}${BOX.vertical}${RESET}`
+  })
+
+  // 构建底部边框: ╰─────────────────────────────────────╯
+  const bottomBorder = `${DIM}${BOX.bottomLeft}${BOX.horizontal.repeat(innerWidth)}${BOX.bottomRight}${RESET}`
+
+  return [topBorder, ...contentRows, bottomBorder].join('\n')
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 多Agent面板渲染 - 按照 tui-design skill 的 Widget Dashboard 设计
 // ═══════════════════════════════════════════════════════════════
 
 function renderAgentBoard(agents: Array<{ id: string; label: string; task: string; status: string; current_tool?: string; result_summary?: string }>): string {
   if (agents.length === 0) return ''
 
-  const bar = `${DIM}${BOX.vertical}${RESET} `
-  const innerWidth = BOX_INNER_WIDTH
-  const lines: string[] = []
+  const totalWidth = 60
+  const innerWidth = totalWidth - 2
 
-  // 顶部边框 - 带标题
-  const title = ' agents '
-  const titleWidth = title.length
-  const dashCount = Math.max(1, innerWidth - titleWidth - 2)
-  lines.push(`${bar}${DIM}${BOX.topLeft}${BOLD}${ACCENT_PRIMARY}${title}${RESET}${DIM}${BOX.horizontal.repeat(dashCount)}${BOX.topRight}${RESET}`)
-
-  // 每个 agent 行
+  // 构建每个agent的内容行
+  const agentLines: string[] = []
   for (const agent of agents) {
     const icon = agent.status === 'running' ? `${STATUS_RUNNING}⚡${RESET}`
       : agent.status === 'done' ? `${STATUS_SUCCESS}✓${RESET}`
@@ -199,24 +247,17 @@ function renderAgentBoard(agents: Array<{ id: string; label: string; task: strin
       : FG_MUTED
 
     const labelRaw = displayWidth(agent.label) > 12 ? truncateByWidth(agent.label, 10) : agent.label
-    const taskRaw = displayWidth(agent.task) > 28 ? truncateByWidth(agent.task, 25) : agent.task
+    const taskRaw = displayWidth(agent.task) > 30 ? truncateByWidth(agent.task, 28) : agent.task
     const statusText = agent.status
 
-    const content = `${icon} ${BOLD}${labelRaw}${RESET} ${taskRaw} ${statusColor}${statusText}${RESET}`
-    const contentWidth = displayWidth(content)
-    const padding = Math.max(1, innerWidth - 1 - contentWidth)
-
-    lines.push(`${bar}${DIM}${BOX.vertical}${RESET} ${content}${' '.repeat(padding)}${DIM}${BOX.vertical}${RESET}`)
+    agentLines.push(`${icon} ${BOLD}${labelRaw}${RESET} ${taskRaw} ${statusColor}${statusText}${RESET}`)
   }
 
-  // 底部边框
-  lines.push(`${bar}${DIM}${BOX.bottomLeft}${BOX.horizontal.repeat(innerWidth - 2)}${BOX.bottomRight}${RESET}`)
-
-  return lines.join('\n')
+  return renderCard('agents', agentLines, totalWidth)
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 工具调用卡片渲染
+// 工具调用卡片渲染 - 按照 tui-design skill 设计
 // ═══════════════════════════════════════════════════════════════
 
 function renderToolCard(entry: Extract<TranscriptEntry, { kind: 'tool' }>, _width?: number): string {
@@ -239,52 +280,29 @@ function renderToolCard(entry: Extract<TranscriptEntry, { kind: 'tool' }>, _widt
         : previewToolBody(entry.toolName, renderMarkdownish(entry.body))
 
   const contentLines = body.split('\n')
-  const boxInnerWidth = BOX_INNER_WIDTH
+  const totalWidth = 60
 
-  // 顶部边框 - 工具名称 + 状态
-  const headerRight = `${statusIcon}${durationStr}`
-  const toolNameWidth = displayWidth(entry.toolName)
-  const headerRightWidth = displayWidth(entry.status === 'success' ? '✓' : entry.status === 'error' ? '✗' : '⏳') + (entry.duration !== undefined ? displayWidth(` ${entry.duration}ms`) : 0)
-  const usedWidth = toolNameWidth + headerRightWidth + 6
-  const headerDash = Math.max(1, boxInnerWidth - usedWidth)
-  const header = `${DIM}${BOX.topLeft} ${BOLD}${entry.toolName}${RESET}${DIM} ${BOX.horizontal.repeat(headerDash)} ${headerRight} ${DIM}${BOX.topRight}${RESET}`
-
-  // 内容行
-  const rows = contentLines.map(line => {
-    let w = displayWidth(line)
-    let displayLine = line
-    if (w > boxInnerWidth - 3) {
-      displayLine = truncateByWidth(line, boxInnerWidth - 3)
-      w = displayWidth(displayLine)
-    }
-    const pad = Math.max(0, boxInnerWidth - w - 1)
-    return `${DIM}${BOX.vertical}${RESET} ${displayLine}${' '.repeat(pad)}${DIM}${BOX.vertical}${RESET}`
-  })
-
-  // 底部边框
-  const footer = `${DIM}${BOX.bottomLeft}${BOX.horizontal.repeat(boxInnerWidth)}${BOX.bottomRight}${RESET}`
-
-  const bar = `${ACCENT_PRIMARY}${BOX.vertical}${RESET} `
-  return [`${bar}${header}`, ...rows.map(l => `${bar}${l}`), `${bar}${footer}`].join('\n')
+  return renderCard(entry.toolName, contentLines, totalWidth, statusIcon, durationStr)
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 用户消息渲染
+// 用户消息渲染 - 按照 tui-design skill 设计
 // ═══════════════════════════════════════════════════════════════
 
 function renderUserMessage(entry: Extract<TranscriptEntry, { kind: 'user' }>, width?: number): string {
-  const inner = (width ?? getTranscriptPanelWidth()) - 4
-  const bar = ACCENT_PRIMARY + BOLD + '▌' + BG_USER + FG_DARK + ' '
-  const emptyBar = ACCENT_PRIMARY + BOLD + '▌' + BG_USER + ' '
+  const panelWidth = width ?? getTranscriptPanelWidth()
+  const inner = panelWidth - 4
+  const bar = `${ACCENT_PRIMARY}${BOLD}▌${RESET}${BG_USER}${FG_DARK} `
+  const emptyBar = `${ACCENT_PRIMARY}${BOLD}▌${RESET}${BG_USER} `
   const bodyLines = entry.body.replace(/\t/g, '    ').split('\n')
   const contentLines = bodyLines.map(line => {
     const content = bar + line
     const w = displayWidth(content)
     const pad = ' '.repeat(Math.max(0, inner - w))
-    return BG_USER + content + pad + RESET
+    return `${BG_USER}${content}${pad}${RESET}`
   })
   const emptyPad = ' '.repeat(Math.max(0, inner - 2))
-  const emptyGray = BG_USER + emptyBar + emptyPad + RESET
+  const emptyGray = `${BG_USER}${emptyBar}${emptyPad}${RESET}`
   return [emptyGray, ...contentLines, emptyGray].join('\n')
 }
 
@@ -308,7 +326,7 @@ function renderTranscriptEntry(entry: TranscriptEntry, width?: number): string {
   }
 
   if (entry.kind === 'orchestrator') {
-    return `${ACCENT_SECONDARY}${BOLD}orchestrator${RESET} ${DIM}${BOX.vertical}${RESET} ${indentBlock(renderMarkdownish(entry.body))}`
+    return `${ACCENT_PRIMARY}${BOLD}orchestrator${RESET} ${DIM}${BOX.vertical}${RESET} ${indentBlock(renderMarkdownish(entry.body))}`
   }
 
   if (entry.kind === 'agent_message') {
