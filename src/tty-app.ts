@@ -790,15 +790,12 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
   flushFrame(parts, { row: inputRow, col: cursorCol })
 }
 
-function flushFrame(parts: string[], cursorPos?: { row: number; col: number }): void {
+function flushFrame(parts: string[], _cursorPos?: { row: number; col: number }): void {
   const frame = parts.join('\n')
   const lines = frame.split('\n')
   renderFrame(lines)
-  if (cursorPos) {
-    showCursor()
-    moveCursorTo(cursorPos.row, cursorPos.col)
-    enableCursorBlink()
-  }
+  // 隐藏终端光标，因为我们使用 █ 字符作为光标
+  hideCursor()
 }
 
 async function refreshSystemPrompt(args: TtyAppArgs): Promise<void> {

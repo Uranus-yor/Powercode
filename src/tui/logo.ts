@@ -97,11 +97,10 @@ export function renderInputPanel(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? ''
     if (i === cursorLine) {
-      // 光标所在行：插入光标
+      // 光标所在行：使用实心方块 █ 作为光标
       const before = line.slice(0, Math.min(offset, line.length))
-      const cursorCh = line[offset] ?? ' '
       const after = line.slice(Math.min(offset + 1, line.length))
-      result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${before}${REVERSE}${cursorCh}${RESET}${after}`)
+      result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${before}${SUCCESS}█${RESET}${after}`)
     } else if (i === 0) {
       // 第一行
       result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${line}`)
