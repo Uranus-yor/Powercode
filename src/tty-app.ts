@@ -640,20 +640,22 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
   const terminalWidth = process.stdout.columns ?? 80
 
   if (state.transcript.length === 0) {
-    // Startup: fixed-width centered panel (75 chars, matching PowerCode logo)
-    const startupPanelWidth = 75
-    const centeredLeftPad = Math.max(0, Math.floor((terminalWidth - startupPanelWidth) / 2))
+    // Startup: 自适应宽度，最大 75 字符
+    const maxWidth = Math.min(75, terminalWidth - 4)  // 两边留 2 字符边距
+    const centeredLeftPad = Math.max(0, Math.floor((terminalWidth - maxWidth) / 2))
 
     // Vertical centering
     const rows = Math.max(24, process.stdout.rows ?? 40)
-    const contentHeight = 7 + 5  // logo (7 lines) + input panel (5 lines)
+    const logoHeight = 7  // logo 7 行
+    const inputPanelHeight = 3  // 输入面板 3 行（分隔线 + 输入行 + 状态行）
+    const contentHeight = logoHeight + inputPanelHeight
     const verticalPad = Math.max(0, Math.floor((rows - contentHeight) / 2))
     for (let i = 0; i < verticalPad; i++) parts.push('')
 
     parts.push(
       renderCenteredLogo(terminalWidth),
       renderInputPanel(
-        startupPanelWidth,
+        maxWidth,
         centeredLeftPad,
         args.runtime?.model ?? 'not-configured',
         state.contextStats ? Math.round(state.contextStats.utilization * 100) : undefined,
@@ -664,7 +666,6 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
 
     // 斜杠菜单
     const startupCommands = getVisibleCommands(state.input)
-    let startupMenuLineCount = 0
     if (startupCommands.length > 0) {
       const menuStr = renderSlashMenu(
         startupCommands,
@@ -672,16 +673,14 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
       )
       const menuPad = ' '.repeat(centeredLeftPad)
       const menuLines = menuStr.split('\n')
-      startupMenuLineCount = menuLines.length
       for (const line of menuLines) {
         parts.push(menuPad + line)
       }
     }
 
-    // parts 结构: [verticalPad..., logo, inputPanel, menuLines...]
-    // 输入面板之前的行数 = verticalPad + logo 的行数
-    const linesBeforeInputPanel = verticalPad + renderCenteredLogo(terminalWidth).split('\n').length
-    const inputRow = linesBeforeInputPanel + 2  // +2: border + input 行（1-indexed）
+    // 计算光标位置
+    const linesBeforeInputPanel = verticalPad + logoHeight
+    const inputRow = linesBeforeInputPanel + 2  // +2: 分隔线 + 输入行（1-indexed）
     const inputText = state.input ?? ''
     const beforeCursor = inputText.slice(0, Math.min(state.cursorOffset, inputText.length))
     const cursorCol = centeredLeftPad + 4 + stringDisplayWidth(beforeCursor)
