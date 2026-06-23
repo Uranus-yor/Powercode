@@ -148,6 +148,7 @@ type ScreenState = {
   transcriptBodyLines: number
   pendingStartupMessages: string[]
   agentBoardManager: AgentBoardManager | null
+  cursorVisible: boolean  // 光标闪烁状态
 }
 
 type TranscriptEntryDraft =
@@ -662,6 +663,7 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
         state.contextStats ? Math.round(state.contextStats.utilization * 100) : undefined,
         state.input,
         state.cursorOffset,
+        state.cursorVisible,
       ),
     )
 
@@ -711,6 +713,7 @@ function renderScreen(args: TtyAppArgs, state: ScreenState): void {
     state.contextStats ? Math.round(state.contextStats.utilization * 100) : undefined,
     state.input,
     state.cursorOffset,
+    state.cursorVisible,
   )
 
   // 运行动画提示（固定位置，不影响输入框位置）
@@ -1828,8 +1831,27 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
     transcriptBodyLines: 20,
     pendingStartupMessages: [],
     agentBoardManager: args.agentBoardManager ?? null,
+    cursorVisible: true,
   }
   state.historyIndex = state.history.length
+
+  // 光标闪烁定时器
+  let cursorBlinkTimer: ReturnType<typeof setInterval> | null = null
+  const startCursorBlink = () => {
+    if (cursorBlinkTimer) return
+    cursorBlinkTimer = setInterval(() => {
+      state.cursorVisible = !state.cursorVisible
+      renderScreen(permissionArgs, state)
+    }, 530) // 约 530ms 切换一次，和终端光标闪烁频率一致
+  }
+  const stopCursorBlink = () => {
+    if (cursorBlinkTimer) {
+      clearInterval(cursorBlinkTimer)
+      cursorBlinkTimer = null
+    }
+    state.cursorVisible = true
+  }
+  startCursorBlink()
 
   const permissionArgs: TtyAppArgs = {
     ...args,

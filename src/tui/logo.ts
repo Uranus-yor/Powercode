@@ -45,6 +45,7 @@ export function renderInputPanel(
   contextPercent?: number,
   input?: string,
   cursorOffset?: number,
+  cursorVisible?: boolean,
 ): string {
   const pad = ' '.repeat(leftPad)
   const result: string[] = []
@@ -94,13 +95,20 @@ export function renderInputPanel(
   }
 
   // 渲染每一行
+  const showCursor = cursorVisible !== false  // 默认显示光标
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? ''
     if (i === cursorLine) {
-      // 光标所在行：使用实心方块 █ 作为光标
+      // 光标所在行：使用反色光标（与背景相反）
       const before = line.slice(0, Math.min(offset, line.length))
+      const cursorCh = line[offset] ?? ' '
       const after = line.slice(Math.min(offset + 1, line.length))
-      result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${before}${SUCCESS}█${RESET}${after}`)
+      // 根据 cursorVisible 决定是否显示反色光标
+      if (showCursor) {
+        result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${before}${REVERSE}${cursorCh}${RESET}${after}`)
+      } else {
+        result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${before}${cursorCh}${after}`)
+      }
     } else if (i === 0) {
       // 第一行
       result.push(`${pad}  ${SUCCESS}${BOLD}>${RESET} ${line}`)
