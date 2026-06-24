@@ -2245,7 +2245,7 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
         const visibleCommands = getVisibleCommands(state.input)
 
         if (event.kind === 'text' && event.ctrl && event.text === 'c') {
-          // If there's a selection, copy it; otherwise exit
+          // 如果有选中的文本，复制到剪贴板
           if (state.selection) {
             const copyWidth = process.stdout.columns ?? 80
             const text = extractSelectedText(state.transcript, state.selection, copyWidth)
@@ -2257,6 +2257,19 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
             renderScreen(permissionArgs, state)
             return
           }
+          // 如果 agent 正在运行，中断对话
+          if (state.isBusy) {
+            state.isBusy = false
+            state.status = null
+            state.activeTool = null
+            pushTranscriptEntry(state, {
+              kind: 'assistant',
+              body: `${DIM}中断 by 用户${RESET}`,
+            })
+            renderScreen(permissionArgs, state)
+            return
+          }
+          // 如果 agent 没运行，退出终端
           finish()
           return
         }
