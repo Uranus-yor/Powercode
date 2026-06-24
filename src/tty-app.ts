@@ -1423,15 +1423,18 @@ async function handleInput(
   }
 
   if (input.startsWith('/')) {
-    const matches = findMatchingSlashCommands(input)
-    pushTranscriptEntry(state, {
-      kind: 'assistant',
-      body:
-        matches.length > 0
-          ? `未识别命令。你是不是想输入：\n${matches.join('\n')}`
-          : '未识别命令。输入 /help 查看可用命令。',
-    })
-    return false
+    // /multi 命令已经在上面处理了，跳过
+    if (!isMultiAgent) {
+      const matches = findMatchingSlashCommands(input)
+      pushTranscriptEntry(state, {
+        kind: 'assistant',
+        body:
+          matches.length > 0
+            ? `未识别命令。你是不是想输入：\n${matches.join('\n')}`
+            : '未识别命令。输入 /help 查看可用命令。',
+      })
+      return false
+    }
   }
 
   await refreshSystemPrompt(args)
