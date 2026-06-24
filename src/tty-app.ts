@@ -149,6 +149,7 @@ type ScreenState = {
   pendingStartupMessages: string[]
   agentBoardManager: AgentBoardManager | null
   cursorVisible: boolean  // 光标闪烁状态
+  abortController: AbortController | null  // 中断控制器
 }
 
 type TranscriptEntryDraft =
@@ -1493,6 +1494,10 @@ async function handleInput(
   const toolStartTimes = new Map<number, number>()
   let boardPollTimer: ReturnType<typeof setInterval> | null = null
 
+  // 创建中断控制器
+  const abortController = new AbortController()
+  state.abortController = abortController
+
   args.permissions.beginTurn()
   try {
     const nextMessages = await runAgentTurn({
@@ -1502,6 +1507,7 @@ async function handleInput(
       cwd: args.cwd,
       permissions: args.permissions,
       modelName: args.runtime?.model ?? '',
+      abortSignal: abortController.signal,
       contentReplacementState: args.contentReplacementState,
       contextCollapseState: args.contextCollapseState,
       onContextStats(stats) {
@@ -1771,6 +1777,7 @@ async function handleInput(
     }
     args.permissions.endTurn()
     state.isBusy = false
+    state.abortController = null
   }
 
   finalizeDanglingRunningTools(state)
@@ -1832,6 +1839,7 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
     pendingStartupMessages: [],
     agentBoardManager: args.agentBoardManager ?? null,
     cursorVisible: true,
+    abortController: null,
   }
   state.historyIndex = state.history.length
 
@@ -2259,9 +2267,11 @@ export async function runTtyApp(args: TtyAppArgs): Promise<void> {
           }
           // 如果 agent 正在运行，中断对话
           if (state.isBusy) {
+            state.abortController?.abort()
             state.isBusy = false
             state.status = null
             state.activeTool = null
+            state.abortController = null
             pushTranscriptEntry(state, {
               kind: 'assistant',
               body: `${DIM}中断 by 用户${RESET}`,

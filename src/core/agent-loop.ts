@@ -97,6 +97,8 @@ export type AgentLoopOptions = {
   contextCollapseState?: ContextCollapseState
   /** 外部设置的引用，当值变为 true 时，循环会在下一步注入总结提示后退出 */
   shouldSummarize?: { value: boolean }
+  /** 中断信号，当 abort 时中断循环 */
+  abortSignal?: AbortSignal
 }
 
 // ========== 主循环 ==========
@@ -145,6 +147,12 @@ export async function runAgentLoop(
   }
 
   for (let step = 0; maxSteps == null || step < maxSteps; step++) {
+    // 检查中断信号
+    if (options.abortSignal?.aborted) {
+      onAssistantMessage?.('中断 by 用户')
+      return messages
+    }
+
     // 外部信号：需要总结（超时触发）
     if (shouldSummarize?.value) {
       const summarizePrompt = '时间到了，请根据你目前已有的工具调用结果，立即输出最终总结。不要再调用任何工具。'
@@ -389,6 +397,12 @@ export async function runAgentLoop(
     }> = []
 
     for (const call of next.calls) {
+      // 检查中断信号
+      if (options.abortSignal?.aborted) {
+        onAssistantMessage?.('中断 by 用户')
+        return messages
+      }
+
       onToolStart?.(call.toolName, call.input)
       const result = await tools.execute(
         call.toolName,
