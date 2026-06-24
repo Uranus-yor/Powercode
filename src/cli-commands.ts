@@ -193,8 +193,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   },
   {
     name: '/multi',
-    usage: '/multi',
-    description: 'Test multi-agent system with a demo task.',
+    usage: '/multi <task>',
+    description: 'Run multi-agent task. Example: /multi review src/ for security issues',
     category: 'Dev',
   },
 ]
@@ -338,10 +338,6 @@ export async function tryHandleLocalCommand(
   if (input === '/memory') {
     const files = await discoverInstructionFiles(cwd)
     return renderMemoryReport(files, cwd)
-  }
-
-  if (input === '/multi') {
-    return 'Multi-agent test mode. Send a complex task like "审查 src/config.ts，顺便跑一下测试" to trigger multi-agent mode.'
   }
 
   if (input === '/model') {
