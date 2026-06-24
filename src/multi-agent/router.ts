@@ -238,7 +238,29 @@ export async function decomposeTask(
     ]
 
     const response = await model.next(messages)
-    const content = response.type === 'assistant' ? response.content : ''
+    
+    // 处理不同类型的响应
+    let content = ''
+    if (response.type === 'assistant') {
+      content = response.content
+    } else if (response.type === 'tool_calls') {
+      // 如果模型返回了工具调用，说明它想直接执行，而不是拆分任务
+      // 这种情况下返回一个 single 策略
+      return {
+        plan: {
+          strategy: 'parallel',
+          outputMode: 'stream',
+          reason: 'Model returned tool calls instead of task plan',
+          tasks: [{
+            id: 'task-1',
+            description: task,
+            tools: response.calls.map(c => c.toolName),
+            depends_on: [],
+          }],
+        },
+        error: null,
+      }
+    }
 
     if (!content) {
       return { plan: null, error: 'LLM returned empty response' }
