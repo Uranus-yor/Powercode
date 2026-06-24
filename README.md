@@ -1,6 +1,7 @@
 <p align="center">
-  <img src="logo.png" alt="PowerCode" width="200">
+  <img src="logos/powercode_logo(3).png" alt="PowerCode" width="200">
 </p>
+
 
 <h1 align="center">PowerCode</h1>
 
