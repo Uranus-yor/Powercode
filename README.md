@@ -23,6 +23,28 @@
 
 PowerCode 是一款强大的终端 AI 编程助手，将大语言模型的能力直接带入你的终端。拥有精美的 TUI 界面、多 Agent 支持和无缝工具集成，彻底改变你的编程方式。
 
+## 界面展示
+
+### 启动界面
+
+<p align="center">
+  <img src="screenshots/startup.png" alt="启动界面" width="800">
+</p>
+
+<p align="center">
+  <em>启动时展示 Logo、模型信息和输入框，简洁优雅</em>
+</p>
+
+### 工作界面
+
+<p align="center">
+  <img src="screenshots/working.png" alt="工作界面" width="800">
+</p>
+
+<p align="center">
+  <em>多 Agent 并行执行，实时状态显示，Markdown 渲染</em>
+</p>
+
 ## 功能特性
 
 ### 精美终端界面
