@@ -1406,30 +1406,60 @@ async function handleInput(
     const task = input.slice('/multi'.length).trim()
     if (task) {
       // 将任务转换为用户消息，让模型决定是否使用 orchestrate_tasks 工具
-      // 添加提示让模型知道这是一个需要多 agent 的任务
       const enhancedTask = `[多 Agent 任务] ${task}\n\n请使用 orchestrate_tasks 工具来执行这个复杂任务。`
       args.messages.push({ role: 'user', content: enhancedTask })
-      // 注意：用户消息已经在调用 handleInput 之前添加过了，这里不需要重复添加
       state.transcriptScrollOffset = 0
       state.status = 'Thinking...'
       state.isBusy = true
       rerender()
 
-      // 触发正常的 agent 循环，模型会自动调用 orchestrate_tasks
+      // 直接执行 agent 循环
+      await refreshSystemPrompt(args)
       try {
-        await refreshSystemPrompt(args)
-        // 返回 false 让主循环继续处理
-        return false
+        const nextMessages = await runAgentTurn({
+          model: args.model,
+          tools: args.tools,
+          messages: args.messages,
+          cwd: args.cwd,
+          permissions: args.permissions,
+          modelName: args.runtime?.model ?? '',
+          contentReplacementState: args.contentReplacementState,
+          contextCollapseState: args.contextCollapseState,
+          onContextStats(stats) {
+            state.contextStats = stats
+            rerender()
+          },
+          onAssistantMessage(content) {
+            pushTranscriptEntry(state, { kind: 'assistant', body: content })
+            state.transcriptScrollOffset = 0
+            rerender()
+          },
+          onToolStart(toolName) {
+            state.activeTool = toolName
+            state.status = `Running ${toolName}...`
+            rerender()
+          },
+          onToolResult() {
+            state.activeTool = null
+            state.status = null
+            rerender()
+          },
+        })
+        
+        // 处理结果
+        args.messages.push(...nextMessages)
+        await saveSession(args.cwd, args.sessionId, args.messages, args.alreadySavedCount)
+        args.alreadySavedCount = args.messages.length - 1
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        pushTranscriptEntry(state, {
-          kind: 'assistant',
-          body: `Error: ${message}`,
-        })
+        pushTranscriptEntry(state, { kind: 'assistant', body: `Error: ${message}` })
+      } finally {
         state.isBusy = false
         state.status = null
-        return false
+        state.activeTool = null
+        rerender()
       }
+      return false
     }
     pushTranscriptEntry(state, {
       kind: 'assistant',
