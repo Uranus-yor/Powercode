@@ -1405,21 +1405,31 @@ async function handleInput(
   if (input.startsWith('/multi')) {
     const task = input.slice('/multi'.length).trim()
     if (task) {
-      // Force multi-agent mode: decompose and execute directly
-      const { decomposeTask } = await import('./multi-agent/router.js')
-      const { plan, error } = await decomposeTask(task, args.model)
-      if (plan) {
-        args.messages.push({ role: 'user', content: task })
-        await handleMultiAgentInput(args, state, rerender, task, plan)
-        await saveSession(args.cwd, args.sessionId, args.messages, args.alreadySavedCount)
-        args.alreadySavedCount = args.messages.length - 1
-      } else {
+      // 将任务转换为用户消息，让模型决定是否使用 orchestrate_tasks 工具
+      // 添加提示让模型知道这是一个需要多 agent 的任务
+      const enhancedTask = `[多 Agent 任务] ${task}\n\n请使用 orchestrate_tasks 工具来执行这个复杂任务。`
+      args.messages.push({ role: 'user', content: enhancedTask })
+      pushTranscriptEntry(state, { kind: 'user', body: task })
+      state.transcriptScrollOffset = 0
+      state.status = 'Thinking...'
+      state.isBusy = true
+      rerender()
+
+      // 触发正常的 agent 循环，模型会自动调用 orchestrate_tasks
+      try {
+        await refreshSystemPrompt(args)
+        // 返回 false 让主循环继续处理
+        return false
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
         pushTranscriptEntry(state, {
           kind: 'assistant',
-          body: `任务拆分失败: ${error ?? '未知错误'}`,
+          body: `Error: ${message}`,
         })
+        state.isBusy = false
+        state.status = null
+        return false
       }
-      return false
     }
     pushTranscriptEntry(state, {
       kind: 'assistant',
