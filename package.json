@@ -4,8 +4,7 @@
   "private": true,
   "type": "module",
   "bin": {
-    "powercode": "./bin/minicode",
-    "mimo": "./bin/minicode"
+    "power": "./bin/minicode"
   },
   "scripts": {
     "dev": "tsx src/index.ts",
