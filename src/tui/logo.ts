@@ -99,15 +99,15 @@ export function renderInputPanel(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? ''
     if (i === cursorLine) {
-      // 光标所在行：使用反色光标（与背景相反）
+      // 光标所在行
       const before = line.slice(0, Math.min(offset, line.length))
       const cursorCh = line[offset] ?? ' '
       const after = line.slice(Math.min(offset + 1, line.length))
-      // 根据 cursorVisible 决定是否显示反色光标
+      // > 用暗灰色，光标用反色
       if (showCursor) {
-        result.push(`${pad}  ${REVERSE}>${RESET} ${before}${REVERSE}${cursorCh}${RESET}${after}`)
+        result.push(`${pad}  ${DIM}>${RESET} ${before}${REVERSE}${cursorCh}${RESET}${after}`)
       } else {
-        result.push(`${pad}  ${DIM}>${RESET} ${before}${cursorCh}${after}`)
+        result.push(`${pad}  ${DIM}>${RESET} ${before} ${after}`)
       }
     } else if (i === 0) {
       // 第一行
