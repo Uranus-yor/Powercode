@@ -1,0 +1,7 @@
+Use case: logo-brand
+Asset type: logomark symbol
+Primary request: A minimal logo symbol for "PowerCode" - a terminal AI coding assistant. Design a lightning bolt integrated with terminal code bracket >_ symbol. The lightning bolt should be clean and geometric, merging seamlessly with the terminal prompt symbol.
+Style/medium: flat vector logo design, monochrome black on white
+Composition/framing: centered, square format, minimal
+Constraints: No text, no gradients, no shadows, clean edges, scalable, professional logo quality
+Avoid: realistic style, 3D effects, complex details, watermarks
