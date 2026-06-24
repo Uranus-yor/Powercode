@@ -1402,70 +1402,24 @@ async function handleInput(
     return false
   }
 
+  // 标记是否由 /multi 命令处理
+  let isMultiAgent = false
+
   if (input.startsWith('/multi')) {
     const task = input.slice('/multi'.length).trim()
     if (task) {
-      // 将任务转换为用户消息，让模型决定是否使用 orchestrate_tasks 工具
+      // 包装用户输入，让大模型使用 orchestrate_tasks 工具
+      isMultiAgent = true
       const enhancedTask = `[多 Agent 任务] ${task}\n\n请使用 orchestrate_tasks 工具来执行这个复杂任务。`
       args.messages.push({ role: 'user', content: enhancedTask })
-      state.transcriptScrollOffset = 0
-      state.status = 'Thinking...'
-      state.isBusy = true
-      rerender()
-
-      // 直接执行 agent 循环
-      await refreshSystemPrompt(args)
-      try {
-        const nextMessages = await runAgentTurn({
-          model: args.model,
-          tools: args.tools,
-          messages: args.messages,
-          cwd: args.cwd,
-          permissions: args.permissions,
-          modelName: args.runtime?.model ?? '',
-          contentReplacementState: args.contentReplacementState,
-          contextCollapseState: args.contextCollapseState,
-          onContextStats(stats) {
-            state.contextStats = stats
-            rerender()
-          },
-          onAssistantMessage(content) {
-            pushTranscriptEntry(state, { kind: 'assistant', body: content })
-            state.transcriptScrollOffset = 0
-            rerender()
-          },
-          onToolStart(toolName) {
-            state.activeTool = toolName
-            state.status = `Running ${toolName}...`
-            rerender()
-          },
-          onToolResult() {
-            state.activeTool = null
-            state.status = null
-            rerender()
-          },
-        })
-        
-        // 处理结果
-        args.messages.push(...nextMessages)
-        await saveSession(args.cwd, args.sessionId, args.messages, args.alreadySavedCount)
-        args.alreadySavedCount = args.messages.length - 1
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        pushTranscriptEntry(state, { kind: 'assistant', body: `Error: ${message}` })
-      } finally {
-        state.isBusy = false
-        state.status = null
-        state.activeTool = null
-        rerender()
-      }
+      // 继续执行正常的 agent loop，不返回
+    } else {
+      pushTranscriptEntry(state, {
+        kind: 'assistant',
+        body: '用法: /multi <任务描述>\n例如: /multi 审查 src/ 下所有模块的安全性',
+      })
       return false
     }
-    pushTranscriptEntry(state, {
-      kind: 'assistant',
-      body: '用法: /multi <任务描述>\n例如: /multi 审查 src/ 下所有模块的安全性',
-    })
-    return false
   }
 
   if (input.startsWith('/')) {
@@ -1491,7 +1445,10 @@ async function handleInput(
     state.pendingStartupMessages = []
   }
 
-  args.messages.push({ role: 'user', content: input })
+  // 只有非 /multi 命令才需要添加用户消息
+  if (!isMultiAgent) {
+    args.messages.push({ role: 'user', content: input })
+  }
   // Note: user transcript entry is pushed by the caller before handleInput,
   // so the working state appears immediately. Don't push again here.
   state.transcriptScrollOffset = 0
