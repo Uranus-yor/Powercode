@@ -1409,7 +1409,7 @@ async function handleInput(
       // 添加提示让模型知道这是一个需要多 agent 的任务
       const enhancedTask = `[多 Agent 任务] ${task}\n\n请使用 orchestrate_tasks 工具来执行这个复杂任务。`
       args.messages.push({ role: 'user', content: enhancedTask })
-      pushTranscriptEntry(state, { kind: 'user', body: task })
+      // 注意：用户消息已经在调用 handleInput 之前添加过了，这里不需要重复添加
       state.transcriptScrollOffset = 0
       state.status = 'Thinking...'
       state.isBusy = true
